@@ -14,18 +14,22 @@ import * as string from "lib0/string";
 export const deriveKey = (secret: string, roomName: string) => {
   const secretBuffer = string.encodeUtf8(secret).buffer;
   const salt = string.encodeUtf8(roomName).buffer;
-  
+
   // Ensure we have ArrayBuffer, not ArrayBufferLike
-  const secretArrayBuffer = secretBuffer instanceof ArrayBuffer ? secretBuffer : new ArrayBuffer(secretBuffer.byteLength);
-  const saltArrayBuffer = salt instanceof ArrayBuffer ? salt : new ArrayBuffer(salt.byteLength);
-  
+  const secretArrayBuffer =
+    secretBuffer instanceof ArrayBuffer
+      ? secretBuffer
+      : new ArrayBuffer(secretBuffer.byteLength);
+  const saltArrayBuffer =
+    salt instanceof ArrayBuffer ? salt : new ArrayBuffer(salt.byteLength);
+
   if (secretBuffer !== secretArrayBuffer) {
     new Uint8Array(secretArrayBuffer).set(new Uint8Array(secretBuffer));
   }
   if (salt !== saltArrayBuffer) {
     new Uint8Array(saltArrayBuffer).set(new Uint8Array(salt));
   }
-  
+
   return crypto.subtle
     .importKey("raw", secretArrayBuffer, "PBKDF2", false, ["deriveKey"])
     .then((keyMaterial) =>
@@ -57,6 +61,14 @@ export const encrypt = async (data: Uint8Array, key?: CryptoKey) => {
     return data;
   }
   const iv = crypto.getRandomValues(new Uint8Array(12));
+  // Ensure data has ArrayBuffer backing for Web Crypto API
+  const dataBuffer =
+    data.buffer instanceof ArrayBuffer
+      ? data
+      : new Uint8Array(new ArrayBuffer(data.byteLength));
+  if (dataBuffer !== data) {
+    dataBuffer.set(data);
+  }
   return crypto.subtle
     .encrypt(
       {
@@ -64,7 +76,7 @@ export const encrypt = async (data: Uint8Array, key?: CryptoKey) => {
         iv,
       },
       key,
-      data
+      dataBuffer as BufferSource
     )
     .then((cipher) => {
       const encryptedDataEncoder = encoding.createEncoder();
@@ -102,14 +114,29 @@ export const decrypt = async (data: Uint8Array, key?: CryptoKey) => {
   }
   const iv = decoding.readVarUint8Array(dataDecoder);
   const cipher = decoding.readVarUint8Array(dataDecoder);
+  // Ensure iv and cipher have ArrayBuffer backing for Web Crypto API
+  const ivBuffer =
+    iv.buffer instanceof ArrayBuffer
+      ? iv
+      : new Uint8Array(new ArrayBuffer(iv.byteLength));
+  const cipherBuffer =
+    cipher.buffer instanceof ArrayBuffer
+      ? cipher
+      : new Uint8Array(new ArrayBuffer(cipher.byteLength));
+  if (ivBuffer !== iv) {
+    ivBuffer.set(iv);
+  }
+  if (cipherBuffer !== cipher) {
+    cipherBuffer.set(cipher);
+  }
   return crypto.subtle
     .decrypt(
       {
         name: "AES-GCM",
-        iv,
+        iv: ivBuffer as BufferSource,
       },
       key,
-      cipher
+      cipherBuffer as BufferSource
     )
     .then((data) => new Uint8Array(data));
 };

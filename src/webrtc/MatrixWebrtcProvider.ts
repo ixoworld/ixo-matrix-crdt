@@ -26,7 +26,10 @@ export class MatrixWebrtcProvider {
 
   /* hooks that subclasses may override ------------------------------------ */
   // eslint‑disable-next-line @typescript-eslint/no-unused-vars
-  public onCustomMessage = (_buf: Uint8Array, _reply: (m: Uint8Array) => void): void => {
+  public onCustomMessage = (
+    _buf: Uint8Array,
+    _reply: (m: Uint8Array) => void
+  ): void => {
     console.warn("[MatrixWebrtcProvider] onCustomMessage not implemented");
   };
   // eslint‑disable-next-line @typescript-eslint/no-unused-vars
@@ -107,10 +110,14 @@ class MatrixWebrtcRoom {
 
   /* ----------------------------------------------------- matrix → rtc */
   private async announcePresence() {
-    await this.matrixClient.sendEvent(this.roomId, "com.yjs.webrtc.announce" as any, {
-      peerId: this.myPeerId,
-      timestamp: Date.now(),
-    });
+    await this.matrixClient.sendEvent(
+      this.roomId,
+      "com.yjs.webrtc.announce" as any,
+      {
+        peerId: this.myPeerId,
+        timestamp: Date.now(),
+      }
+    );
   }
 
   private handleMatrixEvent(event: any, room: any) {
@@ -121,7 +128,10 @@ class MatrixWebrtcRoom {
     const type = event.getType();
 
     // Ignore *this* tab's own echo (same MXID *and* same peerId)
-    if (sender === this.matrixClient.getUserId() && content.peerId === this.myPeerId) {
+    if (
+      sender === this.matrixClient.getUserId() &&
+      content.peerId === this.myPeerId
+    ) {
       return;
     }
 
@@ -275,7 +285,9 @@ class MatrixWebrtcConn {
     switch (signal.type) {
       case "offer": {
         if (this.isInitiator) {
-          console.debug("[MatrixWebrtcConn] Ignoring colliding offer – I am initiator");
+          console.debug(
+            "[MatrixWebrtcConn] Ignoring colliding offer – I am initiator"
+          );
           return;
         }
         await this.pc.setRemoteDescription(signal.offer);
@@ -303,17 +315,31 @@ class MatrixWebrtcConn {
   }
 
   private async sendSignal(signal: any) {
-    await this.matrixClient.sendEvent(this.roomId, "com.yjs.webrtc.signal" as any, {
-      fromPeer: this.myPeerId,
-      fromUser: this.matrixClient.getUserId(),
-      targetPeer: this.peerId,
-      signal,
-    });
+    await this.matrixClient.sendEvent(
+      this.roomId,
+      "com.yjs.webrtc.signal" as any,
+      {
+        fromPeer: this.myPeerId,
+        fromUser: this.matrixClient.getUserId(),
+        targetPeer: this.peerId,
+        signal,
+      }
+    );
   }
 
   /* ------------------------------------------------ public helpers */
   send(msg: Uint8Array) {
-    if (this.channel && this.connected) this.channel.send(msg);
+    if (this.channel && this.connected) {
+      // Ensure msg has ArrayBuffer backing for WebRTC DataChannel
+      const msgBuffer =
+        msg.buffer instanceof ArrayBuffer
+          ? msg
+          : new Uint8Array(new ArrayBuffer(msg.byteLength));
+      if (msgBuffer !== msg) {
+        msgBuffer.set(msg);
+      }
+      this.channel.send(msgBuffer as ArrayBufferView<ArrayBuffer>);
+    }
   }
 
   close() {

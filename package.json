@@ -61,6 +61,7 @@
   "scripts": {
     "clean": "rimraf dist && rimraf types",
     "build": "npm run clean && tsc && vite build",
+    "prepare": "npm run build",
     "test": "vitest run --coverage",
     "watch": "tsc --watch",
     "bench": "NODE_OPTIONS='--max-old-space-size=4096' ts-node --files -O '{\"module\":\"commonjs\"}' src/matrix-crdt/benchmark/benchmarkTest.ts "

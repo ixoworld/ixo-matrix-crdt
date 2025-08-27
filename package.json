@@ -48,14 +48,14 @@
     "/types"
   ],
   "source": "src/index.ts",
-  "types": "types/index.d.ts",
-  "main": "./dist/matrix-crdt.umd.cjs",
-  "module": "./dist/matrix-crdt.js",
+  "types": "./types/index.d.ts",
+  "main": "./dist/ixo-matrix-crdt.umd.cjs",
+  "module": "./dist/ixo-matrix-crdt.js",
   "exports": {
     ".": {
-      "types": "./types/index.d.ts",
-      "import": "./dist/matrix-crdt.js",
-      "require": "./dist/matrix-crdt.umd.cjs"
+      "import": "./dist/ixo-matrix-crdt.js",
+      "require": "./dist/ixo-matrix-crdt.umd.cjs",
+      "types": "./types/index.d.ts"
     }
   },
   "scripts": {

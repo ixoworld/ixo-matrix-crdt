@@ -53,9 +53,13 @@
   "module": "./dist/ixo-matrix-crdt.js",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
+      "node": "./dist/ixo-matrix-crdt.js",
       "import": "./dist/ixo-matrix-crdt.js",
-      "types": "./types/index.d.ts"
-    }
+      "module": "./dist/ixo-matrix-crdt.js",
+      "default": "./dist/ixo-matrix-crdt.js"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "clean": "rimraf dist && rimraf types",

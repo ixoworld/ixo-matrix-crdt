@@ -6,7 +6,8 @@ export default defineConfig({
     lib: {
       name: "matrix-crdt",
       entry: resolve(__dirname, "src/index.ts"),
-      formats: ["es"],
+      formats: ["es", "cjs"],
+      fileName: (format) => `ixo-matrix-crdt.${format === 'es' ? 'js' : 'cjs'}`,
     },
     rollupOptions: {
       // make sure to externalize deps that shouldn't be bundled

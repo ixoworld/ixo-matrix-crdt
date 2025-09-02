@@ -772,10 +772,14 @@ class Ps {
   }
   /* ----------------------------------------------------- matrix → rtc */
   async announcePresence() {
-    await this.matrixClient.sendEvent(this.roomId, "com.yjs.webrtc.announce", {
-      peerId: this.myPeerId,
-      timestamp: Date.now()
-    });
+    await this.matrixClient.sendEvent(
+      this.roomId,
+      "com.yjs.webrtc.announce",
+      {
+        peerId: this.myPeerId,
+        timestamp: Date.now()
+      }
+    );
   }
   handleMatrixEvent(e, s) {
     if (s.roomId !== this.roomId) return;
@@ -878,7 +882,9 @@ class De {
     switch (e.type) {
       case "offer": {
         if (this.isInitiator) {
-          console.debug("[MatrixWebrtcConn] Ignoring colliding offer – I am initiator");
+          console.debug(
+            "[MatrixWebrtcConn] Ignoring colliding offer – I am initiator"
+          );
           return;
         }
         await this.pc.setRemoteDescription(e.offer);
@@ -900,12 +906,16 @@ class De {
     }
   }
   async sendSignal(e) {
-    await this.matrixClient.sendEvent(this.roomId, "com.yjs.webrtc.signal", {
-      fromPeer: this.myPeerId,
-      fromUser: this.matrixClient.getUserId(),
-      targetPeer: this.peerId,
-      signal: e
-    });
+    await this.matrixClient.sendEvent(
+      this.roomId,
+      "com.yjs.webrtc.signal",
+      {
+        fromPeer: this.myPeerId,
+        fromUser: this.matrixClient.getUserId(),
+        targetPeer: this.peerId,
+        signal: e
+      }
+    );
   }
   /* ------------------------------------------------ public helpers */
   send(e) {

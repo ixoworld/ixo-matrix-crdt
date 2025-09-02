@@ -6,6 +6,7 @@ export default defineConfig({
     lib: {
       name: "matrix-crdt",
       entry: resolve(__dirname, "src/index.ts"),
+      formats: ["es"],
     },
     rollupOptions: {
       // make sure to externalize deps that shouldn't be bundled

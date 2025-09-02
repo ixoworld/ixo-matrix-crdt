@@ -49,12 +49,11 @@
   ],
   "source": "src/index.ts",
   "types": "./types/index.d.ts",
-  "main": "./dist/ixo-matrix-crdt.umd.cjs",
+  "main": "./dist/ixo-matrix-crdt.js",
   "module": "./dist/ixo-matrix-crdt.js",
   "exports": {
     ".": {
       "import": "./dist/ixo-matrix-crdt.js",
-      "require": "./dist/ixo-matrix-crdt.umd.cjs",
       "types": "./types/index.d.ts"
     }
   },

@@ -48,7 +48,8 @@ export class MatrixReader extends lifecycle.Disposable {
     super();
     this.opts = { ...DEFAULT_OPTIONS, ...opts };
     // TODO: catch events for when room has been deleted or user has been kicked
-    this.matrixClient.on(RoomEvent.Timeline, this.matrixRoomListener);
+    // Note: Disabled timeline listener as it conflicts when the same client is used for writing
+    // this.matrixClient.on(RoomEvent.Timeline, this.matrixRoomListener);
   }
 
   /**
@@ -262,6 +263,7 @@ export class MatrixReader extends lifecycle.Disposable {
     if (this.pendingPollRequest) {
       // this.pendingPollRequest.abort();
     }
-    this.matrixClient.off(RoomEvent.Timeline, this.matrixRoomListener);
+    // Note: Listener registration disabled to avoid conflicts
+    // this.matrixClient.off(RoomEvent.Timeline, this.matrixRoomListener);
   }
 }

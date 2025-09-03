@@ -6,7 +6,7 @@
     "name": "IXO"
   },
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "license": "MPL-2.0",
   "dependencies": {
@@ -28,7 +28,7 @@
     "got": "^14.4.7",
     "jest-environment-jsdom": "^30.0.5",
     "lib0": "^0.2.114",
-    "matrix-js-sdk": "^37.11.0",
+    "matrix-js-sdk": "^37.5.0",
     "qs": "^6.14.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.8.3",
@@ -39,7 +39,7 @@
   },
   "peerDependencies": {
     "lib0": "*",
-    "matrix-js-sdk": "*",
+    "matrix-js-sdk": "^37.5.0",
     "y-protocols": "*",
     "yjs": "*"
   },
@@ -49,13 +49,12 @@
   ],
   "source": "src/index.ts",
   "types": "./types/index.d.ts",
-  "main": "./dist/ixo-matrix-crdt.cjs",
+  "main": "./dist/ixo-matrix-crdt.js",
   "module": "./dist/ixo-matrix-crdt.js",
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
       "import": "./dist/ixo-matrix-crdt.js",
-      "require": "./dist/ixo-matrix-crdt.cjs",
       "default": "./dist/ixo-matrix-crdt.js"
     },
     "./package.json": "./package.json"

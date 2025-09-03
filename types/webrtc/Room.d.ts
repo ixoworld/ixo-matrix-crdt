@@ -14,7 +14,7 @@ export declare class Room {
     private synced;
     readonly webrtcConns: Map<string, WebrtcConn>;
     readonly bcConns: Set<string>;
-    readonly mux: import("lib0/mutex").mutex;
+    readonly mux: import("lib0/mutex.js").mutex;
     private bcconnected;
     private _bcSubscriber;
     readMessage: (buf: Uint8Array, reply: (reply: encoding.Encoder) => void) => void;

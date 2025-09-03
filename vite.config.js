@@ -6,8 +6,8 @@ export default defineConfig({
     lib: {
       name: "matrix-crdt",
       entry: resolve(__dirname, "src/index.ts"),
-      formats: ["es", "cjs"],
-      fileName: (format) => `ixo-matrix-crdt.${format === 'es' ? 'js' : 'cjs'}`,
+      formats: ["es"],
+      fileName: () => `ixo-matrix-crdt.js`,
     },
     rollupOptions: {
       // make sure to externalize deps that shouldn't be bundled
@@ -22,6 +22,10 @@ export default defineConfig({
         "simple-peer",
         "another-json",
       ],
+      output: {
+        preserveModules: true,
+        exports: "named",
+      },
     },
   },
   test: {

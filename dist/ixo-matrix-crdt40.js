@@ -1,6 +1,6 @@
 import { writeVarString as m, createEncoder as u, writeVarUint8Array as i, toUint8Array as A, writeAny as B } from "./ixo-matrix-crdt17.js";
 import { readVarString as h, createDecoder as p, readVarUint8Array as y, readAny as U } from "./ixo-matrix-crdt16.js";
-import { reject as d } from "./ixo-matrix-crdt50.js";
+import { reject as d } from "./ixo-matrix-crdt48.js";
 import { create as b } from "./ixo-matrix-crdt27.js";
 import { encodeUtf8 as s } from "./ixo-matrix-crdt26.js";
 const D = (e, n) => {

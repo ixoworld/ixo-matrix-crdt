@@ -1,4 +1,5 @@
-const t = Symbol("Equality");
+Promise.all.bind(Promise);
+const r = (e) => Promise.reject(e);
 export {
-  t as EqualityTraitSymbol
+  r as reject
 };

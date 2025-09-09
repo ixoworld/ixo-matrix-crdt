@@ -1,6 +1,4 @@
-const o = Object.keys, s = (t) => o(t).length, c = (t, e) => Object.prototype.hasOwnProperty.call(t, e);
+const o = crypto.getRandomValues.bind(crypto);
 export {
-  c as hasProperty,
-  o as keys,
-  s as length
+  o as getRandomValues
 };

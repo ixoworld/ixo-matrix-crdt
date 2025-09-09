@@ -1,9 +1,9 @@
-import { supportsColor as u } from "./ixo-matrix-crdt30.js";
-import { create as f } from "./ixo-matrix-crdt31.js";
-import { create as t } from "./ixo-matrix-crdt32.js";
-import { mapToStyleString as p } from "./ixo-matrix-crdt33.js";
-import { create as m } from "./ixo-matrix-crdt34.js";
-import { createModuleLogger as a, computeNoColorLoggingArgs as h, UNCOLOR as L, ORANGE as d, PURPLE as b, RED as y, GREY as E, GREEN as N, BLUE as R, UNBOLD as S, BOLD as A } from "./ixo-matrix-crdt35.js";
+import { supportsColor as u } from "./ixo-matrix-crdt33.js";
+import { create as f } from "./ixo-matrix-crdt34.js";
+import { create as t } from "./ixo-matrix-crdt35.js";
+import { mapToStyleString as p } from "./ixo-matrix-crdt36.js";
+import { create as m } from "./ixo-matrix-crdt37.js";
+import { createModuleLogger as a, computeNoColorLoggingArgs as h, UNCOLOR as L, ORANGE as d, PURPLE as b, RED as y, GREY as E, GREEN as N, BLUE as R, UNBOLD as S, BOLD as A } from "./ixo-matrix-crdt38.js";
 const B = {
   [A]: t("font-weight", "bold"),
   [S]: t("font-weight", "normal"),

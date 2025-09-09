@@ -1,4 +1,6 @@
-const e = Date.now;
+import { map as o } from "./ixo-matrix-crdt37.js";
+typeof DOMParser < "u" && new DOMParser();
+const p = (e) => o(e, (r, n) => `${n}:${r};`).join("");
 export {
-  e as getUnixTime
+  p as mapToStyleString
 };

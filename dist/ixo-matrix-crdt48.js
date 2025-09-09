@@ -1,5 +1,4 @@
-Promise.all.bind(Promise);
-const r = (e) => Promise.reject(e);
+const e = Symbol;
 export {
-  r as reject
+  e as create
 };

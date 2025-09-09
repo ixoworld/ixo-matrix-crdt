@@ -1,4 +1,4 @@
-const o = crypto.getRandomValues.bind(crypto);
+const i = JSON.stringify;
 export {
-  o as getRandomValues
+  i as stringify
 };

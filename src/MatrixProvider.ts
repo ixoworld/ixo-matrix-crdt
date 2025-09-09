@@ -296,16 +296,17 @@ export class MatrixProvider extends lifecycle.Disposable {
     //             /sync loop on the main client.
     // ────────────────────────────────────────────────────────────────
 
-    const webrtcClient = sdk.createClient({
-      baseUrl:
-        (this.matrixClient as any).baseUrl ||
-        (this.matrixClient as any).clientOpts?.baseUrl,
-      accessToken: (this.matrixClient as any).getAccessToken
-        ? (this.matrixClient as any).getAccessToken()
-        : (this.matrixClient as any).credentials?.accessToken,
-      userId: this.matrixClient.getUserId() || undefined,
-      timelineSupport: true, // we need Room.timeline events
-    });
+    const webrtcClient =  this.matrixClient
+    // sdk.createClient({
+    //   baseUrl:
+    //     (this.matrixClient as any).baseUrl ||
+    //     (this.matrixClient as any).clientOpts?.baseUrl,
+    //   accessToken: (this.matrixClient as any).getAccessToken
+    //     ? (this.matrixClient as any).getAccessToken()
+    //     : (this.matrixClient as any).credentials?.accessToken,
+    //   userId: this.matrixClient.getUserId() || undefined,
+    //   timelineSupport: true, // we need Room.timeline events
+    // });
 
     // Ask the homeserver to send us only signalling events
     let filterId: sdk.Filter | undefined;

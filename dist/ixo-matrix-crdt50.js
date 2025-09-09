@@ -1,16 +1,5 @@
-const n = () => {
-  let e = !0;
-  return (r, t) => {
-    if (e) {
-      e = !1;
-      try {
-        r();
-      } finally {
-        e = !0;
-      }
-    } else t !== void 0 && t();
-  };
-};
+Promise.all.bind(Promise);
+const r = (e) => Promise.reject(e);
 export {
-  n as createMutex
+  r as reject
 };

@@ -1,8 +1,8 @@
 import { create as c } from "./ixo-matrix-crdt27.js";
 import { createModuleLogger as m } from "./ixo-matrix-crdt22.js";
-import { setIfUndefined as d } from "./ixo-matrix-crdt34.js";
+import { setIfUndefined as d } from "./ixo-matrix-crdt37.js";
 import { floor as g } from "./ixo-matrix-crdt28.js";
-import { Observable as a } from "./ixo-matrix-crdt37.js";
+import { Observable as a } from "./ixo-matrix-crdt31.js";
 import { rand as p } from "./ixo-matrix-crdt39.js";
 import { deriveKey as f } from "./ixo-matrix-crdt40.js";
 import { globalSignalingConns as h, globalRooms as n } from "./ixo-matrix-crdt20.js";

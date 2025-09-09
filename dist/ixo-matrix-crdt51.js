@@ -1,7 +1,7 @@
-import { setIfUndefined as c } from "./ixo-matrix-crdt37.js";
-import { create as l } from "./ixo-matrix-crdt34.js";
+import { setIfUndefined as c } from "./ixo-matrix-crdt33.js";
+import { create as l } from "./ixo-matrix-crdt30.js";
 import { fromBase64 as h, toBase64 as i, createUint8ArrayFromArrayBuffer as u } from "./ixo-matrix-crdt54.js";
-import { onChange as b, varStorage as f, offChange as g } from "./ixo-matrix-crdt46.js";
+import { onChange as b, varStorage as f, offChange as g } from "./ixo-matrix-crdt44.js";
 const r = /* @__PURE__ */ new Map();
 class m {
   /**

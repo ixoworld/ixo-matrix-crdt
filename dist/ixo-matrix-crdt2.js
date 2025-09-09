@@ -1,22 +1,23 @@
-import { lifecycle as p, event as c } from "vscode-lib";
+import * as p from "matrix-js-sdk";
+import { lifecycle as f, event as c } from "vscode-lib";
 import * as o from "yjs";
-import { signObject as f, verifyObject as u } from "./ixo-matrix-crdt8.js";
-import { MatrixMemberReader as w } from "./ixo-matrix-crdt7.js";
-import { MatrixReader as v } from "./ixo-matrix-crdt10.js";
-import { SignedWebrtcProvider as g } from "./ixo-matrix-crdt6.js";
-import { BlockNoteAwareness as _ } from "./ixo-matrix-crdt11.js";
-import { ThrottledMatrixWriter as b } from "./ixo-matrix-crdt12.js";
-import { decodeBase64 as y } from "./ixo-matrix-crdt13.js";
-import { arrayBuffersAreEqual as E } from "./ixo-matrix-crdt14.js";
-import { MatrixCRDTEventTranslator as U } from "./ixo-matrix-crdt15.js";
-const z = {
+import { signObject as u, verifyObject as w } from "./ixo-matrix-crdt8.js";
+import { MatrixMemberReader as v } from "./ixo-matrix-crdt7.js";
+import { MatrixReader as g } from "./ixo-matrix-crdt10.js";
+import { SignedWebrtcProvider as _ } from "./ixo-matrix-crdt6.js";
+import { BlockNoteAwareness as b } from "./ixo-matrix-crdt11.js";
+import { ThrottledMatrixWriter as y } from "./ixo-matrix-crdt12.js";
+import { decodeBase64 as E } from "./ixo-matrix-crdt13.js";
+import { arrayBuffersAreEqual as U } from "./ixo-matrix-crdt14.js";
+import { MatrixCRDTEventTranslator as C } from "./ixo-matrix-crdt15.js";
+const x = {
   enableExperimentalWebrtcSync: !1,
   enableAwareness: !1,
   reader: {},
   writer: {},
   translator: {}
 };
-class M extends p.Disposable {
+class O extends f.Disposable {
   /**
    * Creates an instance of MatrixProvider.
    * @param {Y.Doc} doc The `Y.Doc` to sync over the Matrix Room
@@ -34,11 +35,11 @@ class M extends p.Disposable {
    * @memberof MatrixProvider
    */
   constructor(t, e, s, i = {}) {
-    super(), this.doc = t, this.matrixClient = e, this.room = s, this.opts = { ...z, ...i }, this.translator = new U(this.opts.translator), this.throttledWriter = new b(
+    super(), this.doc = t, this.matrixClient = e, this.room = s, this.opts = { ...x, ...i }, this.translator = new C(this.opts.translator), this.throttledWriter = new y(
       this.matrixClient,
       this.translator,
       this.opts.writer
-    ), this.opts.enableAwareness && (this.awareness = new _(t)), t.on("update", this.documentUpdateListener);
+    ), this.opts.enableAwareness && (this.awareness = new b(t)), t.on("update", this.documentUpdateListener);
   }
   disposed = !1;
   _roomId;
@@ -95,7 +96,7 @@ class M extends p.Disposable {
   processIncomingEvents = (t, e = !1) => {
     t = t.filter((r) => !(!this.translator.isUpdateEvent(r) && !this.translator.isSnapshotEvent(r))), this.totalEventsReceived += t.length;
     const s = t.map(
-      (r) => new Uint8Array(y(r.content.update))
+      (r) => new Uint8Array(E(r.content.update))
     ), i = o.mergeUpdates(s);
     if (!s.length)
       return i;
@@ -130,10 +131,16 @@ class M extends p.Disposable {
     if (!this.reader)
       throw new Error("needs reader to initialize webrtc");
     const t = this._register(
-      new w(this.matrixClient, this.reader)
+      new v(this.matrixClient, this.reader)
     );
     await t.initialize();
-    const e = this.matrixClient;
+    const e = p.createClient({
+      baseUrl: this.matrixClient.baseUrl || this.matrixClient.clientOpts?.baseUrl,
+      accessToken: this.matrixClient.getAccessToken ? this.matrixClient.getAccessToken() : this.matrixClient.credentials?.accessToken,
+      userId: this.matrixClient.getUserId() || void 0,
+      timelineSupport: !0
+      // we need Room.timeline events
+    });
     let s;
     try {
       const i = {
@@ -157,16 +164,16 @@ class M extends p.Disposable {
         "sync",
         (n) => n === "PREPARED" && i()
       )
-    ), this._register({ dispose: () => e.stopClient() }), this.webrtcProvider = new g(
+    ), this._register({ dispose: () => e.stopClient() }), this.webrtcProvider = new _(
       this.doc,
       e,
       // <- use the tiny client for signalling
       this._roomId,
       async (i) => {
-        await f(this.matrixClient, i);
+        await u(this.matrixClient, i);
       },
       async (i) => {
-        await u(
+        await w(
           this.matrixClient,
           t,
           i,
@@ -204,7 +211,7 @@ class M extends p.Disposable {
     const r = await this.initializeReader();
     this._onDocumentAvailable.fire();
     const l = o.encodeStateVectorFromUpdate(r), d = o.diffUpdate(e, l);
-    if (E(i.buffer, d.buffer)) {
+    if (U(i.buffer, d.buffer)) {
       let a = new o.Doc();
       o.applyUpdate(a, r);
       let h = o.snapshot(a);
@@ -224,7 +231,7 @@ class M extends p.Disposable {
     if (!this._roomId)
       throw new Error("no roomId");
     this.reader = this._register(
-      new v(
+      new g(
         this.matrixClient,
         this._roomId,
         this.translator,
@@ -269,5 +276,5 @@ function I(m, t) {
   return !0;
 }
 export {
-  M as MatrixProvider
+  O as MatrixProvider
 };

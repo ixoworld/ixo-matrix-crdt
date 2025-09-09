@@ -1,14 +1,11 @@
 {
   "name": "ixo-matrix-crdt",
-  "description": "",
-  "homepage": "https://github.com/ixoworld/ixo-matrix-crdt",
-  "author": {
-    "name": "IXO"
-  },
-  "type": "module",
   "version": "0.3.0",
   "private": false,
   "license": "MPL-2.0",
+  "type": "module",
+  "author": { "name": "IXO" },
+  "homepage": "https://github.com/ixoworld/ixo-matrix-crdt",
   "dependencies": {
     "another-json": "^0.2.0",
     "lodash": "^4.17.21",
@@ -28,7 +25,6 @@
     "got": "^14.4.7",
     "jest-environment-jsdom": "^30.0.5",
     "lib0": "^0.2.114",
-    "matrix-js-sdk": "^37.5.0",
     "qs": "^6.14.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.8.3",
@@ -43,10 +39,7 @@
     "y-protocols": "*",
     "yjs": "*"
   },
-  "files": [
-    "/dist",
-    "/types"
-  ],
+  "files": ["/dist", "/types"],
   "source": "src/index.ts",
   "types": "./types/index.d.ts",
   "main": "./dist/ixo-matrix-crdt.js",
@@ -64,7 +57,6 @@
     "build": "npm run clean && tsc && vite build",
     "prepare": "npm run build",
     "test": "vitest run --coverage",
-    "watch": "tsc --watch",
-    "bench": "NODE_OPTIONS='--max-old-space-size=4096' ts-node --files -O '{\"module\":\"commonjs\"}' src/matrix-crdt/benchmark/benchmarkTest.ts "
+    "watch": "tsc --watch"
   }
 }

@@ -3,7 +3,7 @@ import { createModuleLogger as b } from "./ixo-matrix-crdt22.js";
 import y from "simple-peer";
 import { announceSignalingInfo as a } from "./ixo-matrix-crdt20.js";
 import { customMessage as C } from "./ixo-matrix-crdt53.js";
-import { BOLD as n, GREY as d, UNBOLD as h, UNCOLOR as p } from "./ixo-matrix-crdt38.js";
+import { BOLD as n, GREY as d, UNBOLD as h, UNCOLOR as p } from "./ixo-matrix-crdt34.js";
 const s = b("y-webrtc");
 class L {
   /**

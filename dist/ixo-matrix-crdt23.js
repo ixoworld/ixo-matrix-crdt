@@ -1,4 +1,8 @@
-const E = "m.room.message";
+const F = 64, o = 128, t = 63, c = 127, n = 2147483647;
 export {
-  E as MESSAGE_EVENT_TYPE
+  F as BIT7,
+  o as BIT8,
+  n as BITS31,
+  t as BITS6,
+  c as BITS7
 };

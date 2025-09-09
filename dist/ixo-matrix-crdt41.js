@@ -7,7 +7,7 @@ import { uuidv4 as A } from "./ixo-matrix-crdt39.js";
 import { decrypt as V, encrypt as v } from "./ixo-matrix-crdt40.js";
 import { announceSignalingInfo as x, globalSignalingConns as E } from "./ixo-matrix-crdt20.js";
 import { messageBcPeerId as h, customMessage as b } from "./ixo-matrix-crdt53.js";
-import { BOLD as D, UNBOLD as L } from "./ixo-matrix-crdt38.js";
+import { BOLD as D, UNBOLD as L } from "./ixo-matrix-crdt34.js";
 const N = S("y-webrtc");
 class J {
   // public readonly awareness: awarenessProtocol.Awareness;

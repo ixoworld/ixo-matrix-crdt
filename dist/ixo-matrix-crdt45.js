@@ -1,4 +1,4 @@
-const e = (n) => n === void 0 ? null : n;
+const i = JSON.stringify;
 export {
-  e as undefinedToNull
+  i as stringify
 };

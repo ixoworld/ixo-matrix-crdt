@@ -1,8 +1,6 @@
-const F = 64, o = 128, t = 63, c = 127, n = 2147483647;
+import { floor as r } from "./ixo-matrix-crdt27.js";
+const t = Number.MAX_SAFE_INTEGER, i = Number.isInteger || ((e) => typeof e == "number" && isFinite(e) && r(e) === e);
 export {
-  F as BIT7,
-  o as BIT8,
-  n as BITS31,
-  t as BITS6,
-  c as BITS7
+  t as MAX_SAFE_INTEGER,
+  i as isInteger
 };

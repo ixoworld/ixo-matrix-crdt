@@ -1,4 +1,4 @@
-const e = Symbol;
+const t = Symbol("Equality");
 export {
-  e as create
+  t as EqualityTraitSymbol
 };

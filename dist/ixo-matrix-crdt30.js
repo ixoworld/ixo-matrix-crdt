@@ -1,4 +1,4 @@
-const e = Date.now;
+const e = () => /* @__PURE__ */ new Set();
 export {
-  e as getUnixTime
+  e as create
 };

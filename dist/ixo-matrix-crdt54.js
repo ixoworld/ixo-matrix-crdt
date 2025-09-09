@@ -1,5 +1,5 @@
-import { fromCharCode as f } from "./ixo-matrix-crdt26.js";
-import { isBrowser as n } from "./ixo-matrix-crdt33.js";
+import { fromCharCode as f } from "./ixo-matrix-crdt25.js";
+import { isBrowser as n } from "./ixo-matrix-crdt29.js";
 const s = (r) => new Uint8Array(r), a = (r, e, t) => new Uint8Array(r, e, t), u = (r) => new Uint8Array(r), c = (r) => {
   let e = "";
   for (let t = 0; t < r.byteLength; t++)

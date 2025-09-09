@@ -1,7 +1,7 @@
-import { BIT8 as s, BITS7 as u, BIT7 as S, BITS6 as b } from "./ixo-matrix-crdt24.js";
-import { MAX_SAFE_INTEGER as c } from "./ixo-matrix-crdt25.js";
-import { utf8TextDecoder as g } from "./ixo-matrix-crdt26.js";
-import { create as m } from "./ixo-matrix-crdt27.js";
+import { BIT8 as s, BITS7 as u, BIT7 as S, BITS6 as b } from "./ixo-matrix-crdt23.js";
+import { MAX_SAFE_INTEGER as c } from "./ixo-matrix-crdt24.js";
+import { utf8TextDecoder as g } from "./ixo-matrix-crdt25.js";
+import { create as m } from "./ixo-matrix-crdt26.js";
 const w = m("Unexpected end of array"), y = m("Integer out of Range");
 class A {
   /**

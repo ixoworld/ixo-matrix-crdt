@@ -1,4 +1,4 @@
-import { MESSAGE_EVENT_TYPE as p } from "./ixo-matrix-crdt23.js";
+import { MESSAGE_EVENT_TYPE as p } from "./ixo-matrix-crdt35.js";
 import { encodeBase64 as d } from "./ixo-matrix-crdt13.js";
 const i = {
   // set to true to send everything encapsulated in a m.room.message,

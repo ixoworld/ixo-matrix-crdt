@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.0.2...v1.0.3) (2025-09-10)
+
+
+### Bug Fixes
+
+* package config ([7fd1dd5](https://github.com/ixoworld/ixo-matrix-crdt/commit/7fd1dd54f6a685298747acb3cb3005a924f7323c))
+
 ## [1.0.2](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.0.1...v1.0.2) (2025-09-10)
 
 

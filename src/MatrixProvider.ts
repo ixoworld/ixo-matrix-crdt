@@ -452,7 +452,7 @@ export class MatrixProvider extends lifecycle.Disposable {
    */
   private async initializeReader() {
     if (this.reader) {
-      throw new Error("already initialized reader");
+      throw new Error("Reader already initialized");
     }
     if (!this._roomId) {
       throw new Error("no roomId");

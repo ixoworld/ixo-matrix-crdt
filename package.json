@@ -1,6 +1,7 @@
 {
   "name": "@ixo/matrix-crdt",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "private": false,
   "license": "MPL-2.0",
   "type": "module",
   "author": {

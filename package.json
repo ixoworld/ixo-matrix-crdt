@@ -15,6 +15,11 @@
   "devDependencies": {
     "@matrix-org/olm": "^3.2.15",
     "@peculiar/webcrypto": "^1.5.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^11.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/npm": "^11.0.2",
+    "@semantic-release/release-notes-generator": "^12.1.0",
     "@types/autocannon": "7.12.7",
     "@types/lodash": "^4.17.20",
     "@types/qs": "^6.14.0",
@@ -27,6 +32,7 @@
     "lib0": "^0.2.114",
     "qs": "^6.14.0",
     "rimraf": "^6.0.1",
+    "semantic-release": "^22.0.12",
     "typescript": "^5.8.3",
     "vite": "^7.0.6",
     "vitest": "^3.2.4",
@@ -51,6 +57,10 @@
       "default": "./dist/ixo-matrix-crdt.js"
     },
     "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ixoworld/ixo-matrix-crdt.git"
   },
   "scripts": {
     "clean": "rimraf dist && rimraf types",

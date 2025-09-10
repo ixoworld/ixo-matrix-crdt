@@ -1,5 +1,5 @@
 {
-  "name": "ixo-matrix-crdt",
+  "name": "@ixo/matrix-crdt",
   "version": "0.3.0",
   "private": false,
   "license": "MPL-2.0",

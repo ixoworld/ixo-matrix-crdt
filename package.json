@@ -1,10 +1,12 @@
 {
   "name": "@ixo/matrix-crdt",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "private": false,
   "license": "MPL-2.0",
   "type": "module",
-  "author": { "name": "IXO" },
+  "author": {
+    "name": "IXO"
+  },
   "homepage": "https://github.com/ixoworld/ixo-matrix-crdt",
   "dependencies": {
     "another-json": "^0.2.0",
@@ -45,7 +47,10 @@
     "y-protocols": "*",
     "yjs": "*"
   },
-  "files": ["/dist", "/types"],
+  "files": [
+    "/dist",
+    "/types"
+  ],
   "source": "src/index.ts",
   "types": "./types/index.d.ts",
   "main": "./dist/ixo-matrix-crdt.js",

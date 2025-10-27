@@ -9,6 +9,8 @@ const DEFAULT_OPTIONS = {
   flushInterval: process.env.NODE_ENV === "test" ? 100 : 100 * 5,
   // if writing to the room fails, wait 30 seconds before retrying
   retryIfForbiddenInterval: 1000 * 30,
+  // maximum number of retry attempts after M_FORBIDDEN (0 = unlimited retries)
+  maxForbiddenRetries: 3,
 };
 
 export type ThrottledMatrixWriterOptions = Partial<typeof DEFAULT_OPTIONS>;
@@ -22,6 +24,7 @@ export class ThrottledMatrixWriter extends lifecycle.Disposable {
   private _canWrite = true;
   private retryTimeoutHandler: any;
   private roomId: string | undefined;
+  private forbiddenRetryCount = 0;
 
   private readonly _onCanWriteChanged: event.Emitter<void> = this._register(
     new event.Emitter<void>()
@@ -78,25 +81,30 @@ export class ThrottledMatrixWriter extends lifecycle.Disposable {
     const merged = Y.mergeUpdates(this.pendingUpdates);
     this.pendingUpdates = [];
 
-    let retryImmediately = false;
     try {
       console.log("Sending updates");
       await this.translator.sendUpdate(this.matrixClient, this.roomId, merged);
       this.setCanWrite(true);
+      this.forbiddenRetryCount = 0; // Reset counter on success
       console.log("sent updates");
     } catch (e: any) {
       if (e.errcode === "M_FORBIDDEN") {
         console.warn("not allowed to edit document", e);
         this.setCanWrite(false);
+        this.forbiddenRetryCount++;
 
-        try {
-          // make sure we're in the room, so we can send updates
-          // guests can't / won't join, so MatrixProvider won't send updates for this room
-          await this.matrixClient.joinRoom(this.roomId);
-          console.log("joined room", this.roomId);
-          retryImmediately = true;
-        } catch (e) {
-          console.warn("failed to join room", e);
+        // Check if we've exceeded max retries
+        if (
+          this.opts.maxForbiddenRetries > 0 &&
+          this.forbiddenRetryCount >= this.opts.maxForbiddenRetries
+        ) {
+          console.warn(
+            `Maximum forbidden retry attempts (${this.opts.maxForbiddenRetries}) reached. Stopping retries.`
+          );
+          // Clear pending updates to stop retry loop
+          this.pendingUpdates = [];
+          this._onSentAllEvents.fire();
+          return;
         }
       } else {
         console.error("error sending updates", e);
@@ -112,9 +120,7 @@ export class ThrottledMatrixWriter extends lifecycle.Disposable {
         () => {
           this.throttledFlushUpdatesToMatrix();
         },
-        retryImmediately
-          ? 0
-          : this.canWrite
+        this.canWrite
           ? this.opts.flushInterval
           : this.opts.retryIfForbiddenInterval
       );

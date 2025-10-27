@@ -35,7 +35,9 @@ const DEFAULT_OPTIONS = {
  *    // throttle flushing write events to matrix by 500ms
  *    flushInterval: number = 500,
  *    // if writing to the room fails, wait 30 seconds before retrying
- *    retryIfForbiddenInterval: number = 30000
+ *    retryIfForbiddenInterval: number = 30000,
+ *    // maximum number of retry attempts after M_FORBIDDEN (0 = unlimited retries)
+ *    maxForbiddenRetries: number = 3
  *  },
  *  // Options for `MatrixCRDTEventTranslator`
  *  translator: {

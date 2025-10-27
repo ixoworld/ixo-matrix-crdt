@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.0.3...v1.0.4) (2025-10-27)
+
+
+### Bug Fixes
+
+* add max retry attempts for forbidden writes in ThrottledMatrixWriter ([9c5216d](https://github.com/ixoworld/ixo-matrix-crdt/commit/9c5216dbbcd8872e7ed285aec8bb54f9968c5365))
+
 ## [1.0.3](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.0.2...v1.0.3) (2025-09-10)
 
 

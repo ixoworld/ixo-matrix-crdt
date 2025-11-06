@@ -53,13 +53,14 @@
   ],
   "source": "src/index.ts",
   "types": "./types/index.d.ts",
-  "main": "./dist/ixo-matrix-crdt.js",
-  "module": "./dist/ixo-matrix-crdt.js",
+  "main": "./dist/ixo-matrix-crdt.cjs",
+  "module": "./dist/ixo-matrix-crdt.mjs",
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
-      "import": "./dist/ixo-matrix-crdt.js",
-      "default": "./dist/ixo-matrix-crdt.js"
+      "require": "./dist/ixo-matrix-crdt.cjs",
+      "import": "./dist/ixo-matrix-crdt.mjs",
+      "default": "./dist/ixo-matrix-crdt.cjs"
     },
     "./package.json": "./package.json"
   },

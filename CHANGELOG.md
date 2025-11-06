@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.0.4...v1.1.0) (2025-11-06)
+
+
+### Bug Fixes
+
+* fix lockfile ([9b9ad65](https://github.com/ixoworld/ixo-matrix-crdt/commit/9b9ad65d00cd13c71fd304cdf846c5498d94f7f9))
+
+
+### Features
+
+* add commonjs support also, dual esm and commonjs support ([b1fdf5e](https://github.com/ixoworld/ixo-matrix-crdt/commit/b1fdf5e61833b223f739b5d13560bc38df0f8704))
+
 ## [1.0.4](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.0.3...v1.0.4) (2025-10-27)
 
 

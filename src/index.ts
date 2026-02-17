@@ -1,5 +1,6 @@
 export * from "./MatrixProvider";
 export * from "./matrixRoomManagement";
+export * from "./cloneDocument";
 export * from "./webrtc/DocWebrtcProvider";
 export * from "./webrtc/MatrixWebrtcProvider";
 export { SignedWebrtcProvider } from "./SignedWebrtcProvider";

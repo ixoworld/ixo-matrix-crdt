@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.1.0...v1.2.0) (2026-02-17)
+
+
+### Features
+
+* add cloneDocument utility for instant page cloning ([4dfc2f6](https://github.com/ixoworld/ixo-matrix-crdt/commit/4dfc2f661d1f81042573ffcc8fb1f05cc50e19b9))
+
 # [1.1.0](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.0.4...v1.1.0) (2025-11-06)
 
 

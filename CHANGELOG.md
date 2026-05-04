@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.0...v1.2.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* resolve race condition issue with announce ([30128a7](https://github.com/ixoworld/ixo-matrix-crdt/commit/30128a7d86c1cb7a4feb8cf588ebf41a4ca67288))
+
 # [1.2.0](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.1.0...v1.2.0) (2026-02-17)
 
 

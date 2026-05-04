@@ -170,7 +170,16 @@ class MatrixWebrtcRoom {
     this.webrtcConns.set(peerId, conn);
     this.setupConnectionHandlers(conn);
 
-    if (iAmInitiator) await conn.initiate();
+    if (iAmInitiator) {
+      await conn.initiate();
+    } else {
+      // The lex-smaller peer is supposed to send the offer, but they may not
+      // know we exist yet: Room.timeline only fires for events that arrive
+      // AFTER our listener attaches, and our own announce can land in their
+      // initial-sync replay (which doesn't fire Room.timeline). Re-announce
+      // so they discover us live and initiate.
+      this.announcePresence();
+    }
   }
 
   private handleWebrtcSignal(payload: any) {

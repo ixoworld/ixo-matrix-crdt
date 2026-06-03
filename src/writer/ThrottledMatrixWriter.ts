@@ -1,4 +1,9 @@
-import * as _ from "lodash";
+// Default-import lodash, NOT `import * as _`. lodash is CommonJS; under native
+// Node ESM a namespace import exposes no statically-detectable named members,
+// so `_.throttle` resolves to `undefined` ("n.throttle is not a function") in
+// the published ESM build. The default import binds `module.exports`, which has
+// `.throttle`.
+import _ from "lodash";
 import { MatrixClient } from "matrix-js-sdk";
 import { event, lifecycle } from "vscode-lib";
 import * as Y from "yjs";

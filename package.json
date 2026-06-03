@@ -73,7 +73,6 @@
   "scripts": {
     "clean": "rimraf dist && rimraf types",
     "build": "npm run clean && tsc && vite build",
-    "prepare": "npm run build",
     "test": "vitest run --coverage",
     "watch": "tsc --watch"
   }

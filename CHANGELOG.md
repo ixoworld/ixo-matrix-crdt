@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.1...v1.2.2) (2026-06-03)
+
+
+### Bug Fixes
+
+* default-import lodash so the ESM build resolves throttle under native Node ESM ([b5d902d](https://github.com/ixoworld/ixo-matrix-crdt/commit/b5d902d8bff80bbf5f7b36074e2e3c3ee62cd4d5))
+
 ## [1.2.1](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.0...v1.2.1) (2026-05-04)
 
 

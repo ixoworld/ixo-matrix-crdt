@@ -13,6 +13,7 @@ jobs:
       issues: write # required for release notes
       pull-requests: write # required if using PR comments
       packages: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -76,5 +77,4 @@ jobs:
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
         run: npx semantic-release

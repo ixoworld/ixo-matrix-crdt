@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.2...v1.2.3) (2026-06-03)
+
+
+### Bug Fixes
+
+* bump ([4865545](https://github.com/ixoworld/ixo-matrix-crdt/commit/48655450fe921269d50ccfb72dc8c985deedea8e))
+
 ## [1.2.2](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.1...v1.2.2) (2026-06-03)
 
 

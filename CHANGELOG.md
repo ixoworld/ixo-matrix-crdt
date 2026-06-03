@@ -1,3 +1,10 @@
+## [1.2.4](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.3...v1.2.4) (2026-06-03)
+
+
+### Bug Fixes
+
+* remove prepare script causing publish loop ([4dc9794](https://github.com/ixoworld/ixo-matrix-crdt/commit/4dc979467d335cf4838390f2dad378e8511ad055))
+
 ## [1.2.3](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.2...v1.2.3) (2026-06-03)
 
 

@@ -50,6 +50,12 @@ export class FakeHomeserver {
   public downloadCount = 0;
   /** how many backwards-pagination pages have been requested */
   public messagesRequestCount = 0;
+  /** event-type filters supplied to `/messages`, in request order */
+  public readonly messagesRequestTypeFilters: Array<
+    readonly string[] | undefined
+  > = [];
+
+  private readonly transactions = new Map<string, { event_id: string }>();
 
   public createRoom(roomId: string, opts: FakeRoomOptions = {}) {
     this.rooms.set(roomId, { events: [], encrypted: !!opts.encrypted });
@@ -71,6 +77,30 @@ export class FakeHomeserver {
 
   public createClient(userId = "@alice:fake") {
     return new FakeMatrixClient(this, userId);
+  }
+
+  public getTransaction(
+    roomId: string,
+    eventType: string,
+    userId: string,
+    transactionId: string
+  ) {
+    return this.transactions.get(
+      `${roomId}\u0000${eventType}\u0000${userId}\u0000${transactionId}`
+    );
+  }
+
+  public setTransaction(
+    roomId: string,
+    eventType: string,
+    userId: string,
+    transactionId: string,
+    response: { event_id: string }
+  ) {
+    this.transactions.set(
+      `${roomId}\u0000${eventType}\u0000${userId}\u0000${transactionId}`,
+      response
+    );
   }
 }
 
@@ -133,8 +163,19 @@ export class FakeMatrixClient {
     roomId: string,
     type: string,
     content: any,
-    _txnId?: string
+    txnId?: string
   ) {
+    if (txnId) {
+      const existing = this.hs.getTransaction(
+        roomId,
+        type,
+        this.userId,
+        txnId
+      );
+      if (existing) {
+        return existing;
+      }
+    }
     const room = this.hs.getRoom(roomId);
     // Matrix caps a PDU at 65,536 bytes. Enforcing it here is the whole point of
     // this test suite: it is what makes an inline full-document snapshot
@@ -165,7 +206,11 @@ export class FakeMatrixClient {
       origin_server_ts: Date.now(),
     };
     room.events.push(event);
-    return { event_id: event.event_id };
+    const response = { event_id: event.event_id };
+    if (txnId) {
+      this.hs.setTransaction(roomId, type, this.userId, txnId, response);
+    }
+    return response;
   }
 
   /**
@@ -177,18 +222,54 @@ export class FakeMatrixClient {
     roomId: string,
     fromToken: string,
     limit: number,
-    _dir: any
+    dir: any,
+    timelineFilter?: any
   ) {
     const room = this.hs.getRoom(roomId);
     this.hs.messagesRequestCount++;
-    const cursor = fromToken === "" ? room.events.length : parseInt(fromToken, 10);
-    const start = Math.max(0, cursor - limit);
-    // backwards pagination returns newest-first
-    const chunk = room.events.slice(start, cursor).slice().reverse();
+    const typeFilter = timelineFilter
+      ?.getRoomTimelineFilterComponent?.()
+      ?.toJSON?.()?.types as string[] | undefined;
+    this.hs.messagesRequestTypeFilters.push(typeFilter);
+    const matches = (event: FakeEvent) =>
+      !typeFilter || typeFilter.includes(event.type);
+
+    if (dir === "f") {
+      const cursor =
+        fromToken === "" ? 0 : Math.max(0, parseInt(fromToken, 10));
+      const chunk: FakeEvent[] = [];
+      let index = cursor;
+      while (index < room.events.length && chunk.length < limit) {
+        const event = room.events[index++];
+        if (matches(event)) {
+          chunk.push(event);
+        }
+      }
+      return {
+        chunk,
+        start: String(cursor),
+        end: index < room.events.length ? String(index) : undefined,
+      };
+    }
+
+    const cursor =
+      fromToken === ""
+        ? room.events.length
+        : Math.min(room.events.length, Math.max(0, parseInt(fromToken, 10)));
+    const chunk: FakeEvent[] = [];
+    let index = cursor - 1;
+    // Backwards pagination returns newest-first. The raw timeline cursor keeps
+    // moving over non-matching events just as a homeserver-side filter does.
+    while (index >= 0 && chunk.length < limit) {
+      const event = room.events[index--];
+      if (matches(event)) {
+        chunk.push(event);
+      }
+    }
     return {
       chunk,
       start: String(cursor),
-      end: start === 0 ? undefined : String(start),
+      end: index >= 0 ? String(index + 1) : undefined,
     };
   }
 

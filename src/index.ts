@@ -1,4 +1,5 @@
 export * from "./MatrixProvider";
+export * from "./RoomEventLog";
 export * from "./matrixRoomManagement";
 export {
   MatrixCRDTEventTranslator,

@@ -223,6 +223,77 @@ Things worth knowing before turning it on:
 Note that `cloneDocument()` sends a full document state as a single *update*
 event and is therefore still bound by the 64 KiB event ceiling.
 
+### Filtered catch-up
+
+Initial document catch-up uses a server-side `/messages` timeline filter. The
+filter is derived from `MatrixCRDTEventTranslator.readEventTypes`, so custom
+update/snapshot event types and `matrix-crdt.doc_snapshot_v2` cannot drift out of
+the reader. Unrelated room traffic—including `ixo.flow.run.event` history—does
+not consume document catch-up pages or affect snapshot-election counters.
+The filter also includes the `m.room.encrypted` envelope: end-to-end encryption
+hides the clear custom type from the homeserver, so encrypted events must be
+decrypted and filtered client-side. This is unavoidable in E2EE rooms; clear
+rooms retain full server-side filtering.
+
+### Durable run history with `RoomEventLog`
+
+`RoomEventLog` is a companion to `MatrixProvider` for append-only flow history.
+It uses the same Matrix client and room, but history stays in the room timeline
+instead of the Y.Doc:
+
+```typescript
+import {
+  RoomEventLog,
+  type IRoomEventLog,
+} from "@ixo/matrix-crdt";
+
+const history: IRoomEventLog = new RoomEventLog(matrixClient, roomId);
+
+await history.append({
+  runId: "r-0007",
+  blockId: "block-abc",
+  kind: "action.output",
+  payload: {
+    attempt: 1,
+    output: { claimId: "claim-123" },
+  },
+  // Stable and unique within the room. Retries use the same Matrix
+  // transaction id and converge on one event.
+  idempotencyKey: "r-0007:block-abc:attempt-1:output",
+});
+
+const page = await history.read("r-0007", { limit: 50 });
+const nextPage = page.nextToken
+  ? await history.read("r-0007", {
+      from: page.nextToken,
+      limit: 50,
+    })
+  : undefined;
+
+const subscription = history.subscribe(
+  (entry) => {
+    // Server-authenticated audit metadata:
+    console.log(entry.sender, entry.originServerTs, entry.content);
+  },
+  { runId: "r-0007" }
+);
+
+subscription.dispose();
+```
+
+Events use the strict, versioned `ixo.flow.run.event` v1 schema. Supported kinds
+are `run.started`, `run.closed`, `run.cancelled`, `action.started`,
+`action.output`, `action.done`, `action.failed`, `definition.changed`, and
+`log`. Action events require a `blockId` and positive `attempt`; lifecycle and
+definition events are run-level. Payloads must be finite JSON values.
+
+`read()` filters `/messages` to the run-event type, then filters by `runId`
+client-side. It returns newest-first by default; pass `direction: "forward"` for
+oldest-first. Pagination and subscriptions deduplicate both Matrix event ids and
+persisted idempotency keys, including the immediate local echo of an append.
+When `subscribe()` has no `from` token it starts at the live edge and does not
+replay history.
+
 ### WebRTC (experimental)
 
 ixo-matrix-crdt by default throttles sent events every 500ms (for example, to prevent sending an event every keystroke when building a rich text editor). It also does not support Yjs Awareness updates (for presence information, etc) over Matrix.
@@ -255,10 +326,14 @@ Note: `npm test` runs `vitest run --coverage`, which needs `@vitest/coverage-v8`
 require a Synapse homeserver on `localhost:8888` started from a `test-server/`
 docker-compose directory that is not part of this repository.
 
-The snapshot suites run anywhere, against an in-memory fake homeserver:
+The snapshot, filtered catch-up, and room-event-log suites run anywhere against
+an in-memory fake homeserver:
 
 ```bash
-npx vitest run src/snapshots
+npx vitest run \
+  src/snapshots \
+  src/RoomEventLog.test.ts \
+  src/reader/MatrixReader.filtered.test.ts
 ```
 
 ### Benchmarking

@@ -8,6 +8,7 @@ import {
 import { event, lifecycle } from "vscode-lib";
 import { MatrixCRDTEventTranslator } from "../MatrixCRDTEventTranslator";
 import { attachResolvedUpdate } from "../snapshots/snapshotV2";
+import { createTimelineTypeFilter } from "../util/timelineFilter";
 
 const PEEK_POLL_TIMEOUT = 30 * 1000;
 const PEEK_POLL_ERROR_TIMEOUT = 30 * 1000;
@@ -259,13 +260,17 @@ export class MatrixReader extends lifecycle.Disposable {
     let hasNextPage = true;
     let lastEventInSnapshot: string | undefined;
     this._snapshotDegradations = [];
+    const timelineFilter = createTimelineTypeFilter(
+      this.matrixClient,
+      typeFilter ? [typeFilter] : this.translator.readEventTypes
+    );
     while (hasNextPage) {
       const res = await this.matrixClient.createMessagesRequest(
         this.roomId,
         token,
         30,
-        Direction.Backward
-        // TODO: filter? (see IXO-4117 — derive from translator.readEventTypes)
+        Direction.Backward,
+        timelineFilter
       );
 
       const events = await this.decryptRawEventsIfNecessary(res.chunk);

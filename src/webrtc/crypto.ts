@@ -6,29 +6,20 @@ import * as promise from "lib0/promise";
 import * as error from "lib0/error";
 import * as string from "lib0/string";
 
+const copyToArrayBuffer = (value: Uint8Array): ArrayBuffer => {
+  const copy = new Uint8Array(value.byteLength);
+  copy.set(value);
+  return copy.buffer;
+};
+
 /**
  * @param {string} secret
  * @param {string} roomName
  * @return {PromiseLike<CryptoKey>}
  */
 export const deriveKey = (secret: string, roomName: string) => {
-  const secretBuffer = string.encodeUtf8(secret).buffer;
-  const salt = string.encodeUtf8(roomName).buffer;
-
-  // Ensure we have ArrayBuffer, not ArrayBufferLike
-  const secretArrayBuffer =
-    secretBuffer instanceof ArrayBuffer
-      ? secretBuffer
-      : new ArrayBuffer(secretBuffer.byteLength);
-  const saltArrayBuffer =
-    salt instanceof ArrayBuffer ? salt : new ArrayBuffer(salt.byteLength);
-
-  if (secretBuffer !== secretArrayBuffer) {
-    new Uint8Array(secretArrayBuffer).set(new Uint8Array(secretBuffer));
-  }
-  if (salt !== saltArrayBuffer) {
-    new Uint8Array(saltArrayBuffer).set(new Uint8Array(salt));
-  }
+  const secretArrayBuffer = copyToArrayBuffer(string.encodeUtf8(secret));
+  const saltArrayBuffer = copyToArrayBuffer(string.encodeUtf8(roomName));
 
   return crypto.subtle
     .importKey("raw", secretArrayBuffer, "PBKDF2", false, ["deriveKey"])

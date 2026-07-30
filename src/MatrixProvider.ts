@@ -10,9 +10,10 @@ import { SignedWebrtcProvider } from './SignedWebrtcProvider';
 import { BlockNoteAwareness } from './awareness/BlockNoteAwareness';
 
 import { ThrottledMatrixWriter, ThrottledMatrixWriterOptions } from './writer/ThrottledMatrixWriter';
-import { decodeBase64 } from './util/olmlib';
 import { arrayBuffersAreEqual } from './util/binary';
 import { MatrixCRDTEventTranslator, MatrixCRDTEventTranslatorOptions } from './MatrixCRDTEventTranslator';
+import { detectRoomEncryption, MediaTransport } from './snapshots/mediaTransport';
+import { SnapshotDegradation } from './reader/MatrixReader';
 
 const DEFAULT_OPTIONS = {
 	enableExperimentalWebrtcSync: false,
@@ -20,6 +21,11 @@ const DEFAULT_OPTIONS = {
 	reader: {} as MatrixReaderOptions,
 	writer: {} as ThrottledMatrixWriterOptions,
 	translator: {} as MatrixCRDTEventTranslatorOptions,
+	/**
+	 * Override how snapshot blobs are uploaded to / downloaded from the Matrix
+	 * media repository. Defaults to `defaultMediaTransport`.
+	 */
+	mediaTransport: undefined as MediaTransport | undefined,
 };
 
 /**
@@ -42,6 +48,13 @@ const DEFAULT_OPTIONS = {
  *    updateEventType: "matrix-crdt.doc_update",
  *    // The event type to use for snapshots
  *    snapshotEventType: "matrix-crdt.doc_snapshot",
+ *    // The event type to use for media-backed snapshots
+ *    snapshotV2EventType: "matrix-crdt.doc_snapshot_v2",
+ *    // WRITE media-backed snapshots. Default false ("readers before writers"):
+ *    // reading v2 must be deployed everywhere before anything writes it.
+ *    enableMediaSnapshots: false,
+ *    // also publish legacy inline snapshots while the doc still fits
+ *    keepLegacyInlineSnapshots: true,
  *  }
  *  // Experimental; we can use WebRTC to sync updates instantly over WebRTC.
  *  // See SignedWebrtcProvider.ts for more details + motivation
@@ -84,6 +97,20 @@ export class MatrixProvider extends lifecycle.Disposable {
 
 	private readonly _onReceivedEvents: event.Emitter<void> = this._register(new event.Emitter<void>());
 
+	private readonly _onSnapshotDegraded: event.Emitter<SnapshotDegradation> = this._register(new event.Emitter<SnapshotDegradation>());
+
+	/**
+	 * Fires when a snapshot was found but could not be used (bad pointer, media
+	 * fetch failure, corrupt blob). Catch-up falls back to an older readable
+	 * snapshot or to replaying updates; this is the hook to surface that
+	 * degradation to the user.
+	 */
+	public readonly onSnapshotDegraded: event.Event<SnapshotDegradation> = this._onSnapshotDegraded.event;
+
+	private _roomIsEncrypted: boolean | undefined;
+
+	private roomEncryptionRequested = false;
+
 	private readonly opts: typeof DEFAULT_OPTIONS;
 
 	public readonly onDocumentAvailable: event.Event<void> = this._onDocumentAvailable.event;
@@ -110,6 +137,11 @@ export class MatrixProvider extends lifecycle.Disposable {
 
 	public get awarenessInstance() {
 		return this.awareness;
+	}
+
+	/** Snapshots that could not be read during the last catch-up (see onSnapshotDegraded). */
+	public get snapshotDegradations(): readonly SnapshotDegradation[] {
+		return this.reader?.snapshotDegradations ?? [];
 	}
 
 	public totalEventsReceived = 0;
@@ -146,7 +178,7 @@ export class MatrixProvider extends lifecycle.Disposable {
 		this.opts = { ...DEFAULT_OPTIONS, ...opts };
 		console.log('INITIALIZING MATRIX PROVIDER WITH OPTIONS:', this.opts);
 
-		this.translator = new MatrixCRDTEventTranslator(this.opts.translator);
+		this.translator = new MatrixCRDTEventTranslator(this.opts.translator, this.opts.mediaTransport);
 
 		this.throttledWriter = new ThrottledMatrixWriter(this.matrixClient, this.translator, this.opts.writer);
 
@@ -178,18 +210,28 @@ export class MatrixProvider extends lifecycle.Disposable {
 	 * Handles incoming events from MatrixReader
 	 */
 	private processIncomingEvents = (events: any[], shouldSendSnapshot = false) => {
-		// Filter only relevant events
+		// Filter only relevant events.
+		// Note: a v2 (media-backed) snapshot event only carries a pointer. It is
+		// relevant here exclusively when MatrixReader already fetched and attached
+		// the blob (i.e. during catch-up); live v2 pointers carry no bytes and are
+		// dropped, because we're already up to date via update events.
+		const updatesByEvent = new Map<any, Uint8Array>();
 		events = events.filter(e => {
-			if (!this.translator.isUpdateEvent(e) && !this.translator.isSnapshotEvent(e)) {
+			if (!this.translator.isUpdateEvent(e) && !this.translator.isAnySnapshotEvent(e)) {
 				return false; // only use messages / snapshots
 			}
+			const bytes = this.translator.getUpdateBytes(e);
+			if (!bytes) {
+				return false;
+			}
+			updatesByEvent.set(e, bytes);
 			return true;
 		});
 
 		this.totalEventsReceived += events.length;
 
 		// Create a yjs update from the events
-		const updates = events.map(e => new Uint8Array(decodeBase64(e.content.update)));
+		const updates = events.map(e => updatesByEvent.get(e)!);
 
 		const update = Y.mergeUpdates(updates);
 
@@ -214,9 +256,14 @@ export class MatrixProvider extends lifecycle.Disposable {
 			// A snapshot _could_ also contain events after last_event_id,
 			// for example if the local document contains changes that haven't been flushed to Matrix yet.
 
-			this.translator.sendSnapshot(this.matrixClient, this._roomId!, update, lastEvent.event_id).catch(e => {
-				console.error('failed to send snapshot');
-			});
+			this.ensureRoomEncryptionKnown();
+			this.translator
+				.sendSnapshots(this.matrixClient, this._roomId!, update, lastEvent.event_id, {
+					roomIsEncrypted: this._roomIsEncrypted,
+				})
+				.catch(e => {
+					console.error('failed to send snapshot', e);
+				});
 		}
 
 		// fire _onReceivedEvents if applicable
@@ -226,6 +273,28 @@ export class MatrixProvider extends lifecycle.Disposable {
 		}
 		return update;
 	};
+
+	/**
+	 * Room encryption only affects which inline-snapshot ceiling applies (megolm
+	 * ciphertext is base64, so the 4/3 expansion is paid a second time). It is
+	 * resolved lazily and cached: doing it during initialize() would add an HTTP
+	 * round trip to every document open, while snapshots are sent rarely and by
+	 * one elected client. The first snapshot in a process therefore uses the
+	 * plaintext ceiling, exactly as before this option existed.
+	 */
+	private ensureRoomEncryptionKnown() {
+		if (this._roomIsEncrypted !== undefined || !this._roomId || this.roomEncryptionRequested) {
+			return;
+		}
+		this.roomEncryptionRequested = true;
+		detectRoomEncryption(this.matrixClient, this._roomId)
+			.then(result => {
+				this._roomIsEncrypted = result !== 'unencrypted';
+			})
+			.catch(() => {
+				this.roomEncryptionRequested = false;
+			});
+	}
 
 	/**
 	 * Experimental; we can use WebRTC to sync updates instantly over WebRTC.
@@ -402,6 +471,7 @@ export class MatrixProvider extends lifecycle.Disposable {
 		this.reader = this._register(new MatrixReader(this.matrixClient, this._roomId, this.translator, this.opts.reader));
 
 		this._register(this.reader.onEvents((e: any) => this.processIncomingEvents(e.events, e.shouldSendSnapshot)));
+		this._register(this.reader.onSnapshotDegraded((d: SnapshotDegradation) => this._onSnapshotDegraded.fire(d)));
 		const events = await this.reader.getInitialDocumentUpdateEvents();
 		this.reader.startPolling();
 		return this.processIncomingEvents(events);

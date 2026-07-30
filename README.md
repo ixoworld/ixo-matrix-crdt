@@ -117,7 +117,19 @@ Defaults to:
     updateEventType: "matrix-crdt.doc_update",
     // The event type to use for snapshots
     snapshotEventType: "matrix-crdt.doc_snapshot",
+    // The event type to use for media-backed snapshots (see "Media-backed snapshots")
+    snapshotV2EventType: "matrix-crdt.doc_snapshot_v2",
+    // WRITE media-backed snapshots. Default false: v2 read support must be
+    // deployed everywhere before anything starts writing v2.
+    enableMediaSnapshots: false,
+    // While media snapshots are enabled, also publish a legacy inline snapshot
+    // whenever the document still fits under the inline event ceiling.
+    keepLegacyInlineSnapshots: true,
+    // Override the inline ceiling in bytes of the Yjs update (0 = auto)
+    inlineSnapshotMaxBytes: 0,
   }
+  // Override how snapshot blobs are uploaded to / downloaded from the media repo
+  mediaTransport: undefined,
   // Experimental; we can use WebRTC to sync updates instantly over WebRTC.
   // See SignedWebrtcProvider.ts for more details + motivation
   enableExperimentalWebrtcSync: boolean = false
@@ -150,6 +162,138 @@ To reconstruct your application state (that is, the Yjs document), we eventually
 
 ixo-matrix-crdt sends periodic snapshots that contain a summary of all previous events. When retrieving a snapshot (stored as a Matrix event with type `matrix-crdt.doc_snapshot`), clients can reconstruct application state from that snapshot and don't need to fetch events occurring before that snapshot's `last_event_id` (stored on the event).
 
+### Media-backed snapshots
+
+An inline snapshot is the **entire document**, base64-encoded, inside a single
+Matrix event. Matrix caps an event at 65,536 bytes, which puts the effective
+document ceiling at roughly **45 KB** — and roughly **32 KB in an encrypted
+room**, because the megolm ciphertext is itself base64 and the 4/3 expansion is
+applied twice.
+
+With `translator.enableMediaSnapshots: true`, the document is instead uploaded to
+the Matrix media repository and the event carries only a constant-size pointer:
+
+```json
+{
+  "v": 2,
+  "mxc_url": "mxc://…",
+  "last_event_id": "$…",
+  "state_vector": "…",
+  "size": 132000,
+  "sha256": "…"
+}
+```
+
+Catch-up fetches the blob, applies it, then replays `matrix-crdt.doc_update`
+events after `last_event_id`, exactly as with an inline snapshot. The ceiling
+becomes the homeserver's media limit (~100 MB by default) instead of 64 KiB.
+
+Things worth knowing before turning it on:
+
+- **Media-backed snapshots use a different event type**
+  (`matrix-crdt.doc_snapshot_v2`) and this is load-bearing, not cosmetic. Clients
+  identify snapshots by event type alone and treat finding one as the signal to
+  stop paginating backwards. A media pointer published under the legacy
+  `matrix-crdt.doc_snapshot` type would halt an already-deployed client's
+  backwards walk and then fail to decode an inline payload that isn't there — it
+  would render an empty document and every document in that room would look
+  wiped. Under a new type, older clients simply don't recognise the event, skip
+  it, and keep paginating to a snapshot they can read.
+- **Readers before writers.** `enableMediaSnapshots` is off by default. Deploy a
+  version that can *read* v2 to every client (including headless ones) before
+  enabling the write path anywhere.
+- **Legacy inline snapshots keep being published in parallel** while the document
+  still fits under the inline ceiling (`keepLegacyInlineSnapshots`), so older
+  clients keep their catch-up shortcut. They lose it only once documents actually
+  outgrow the inline ceiling.
+- **Encrypted rooms**: `sendEvent` encrypts the pointer event, but the homeserver
+  never encrypts media. Blobs are therefore encrypted client-side using the
+  Matrix `m.encrypted_file` v2 scheme (AES-256-CTR plus a SHA-256 of the
+  ciphertext) and the key material travels inside the end-to-end encrypted
+  pointer event. Encryption detection fails closed: anything other than a
+  definitive "this room is not encrypted" answer encrypts.
+- **An unreadable snapshot never counts as a successful catch-up.** A bad
+  pointer, a failed media fetch, a corrupt blob or a blob that doesn't match the
+  advertised state vector is skipped: the backwards walk continues to an older
+  readable snapshot, or to room genesis. Subscribe to
+  `provider.onSnapshotDegraded` to surface that. If nothing readable is left at
+  all, catch-up throws `SnapshotUnavailableError` rather than presenting an empty
+  document as the room's state.
+
+Note that `cloneDocument()` sends a full document state as a single *update*
+event and is therefore still bound by the 64 KiB event ceiling.
+
+### Filtered catch-up
+
+Initial document catch-up uses a server-side `/messages` timeline filter. The
+filter is derived from `MatrixCRDTEventTranslator.readEventTypes`, so custom
+update/snapshot event types and `matrix-crdt.doc_snapshot_v2` cannot drift out of
+the reader. Unrelated room traffic—including `ixo.flow.run.event` history—does
+not consume document catch-up pages or affect snapshot-election counters.
+The filter also includes the `m.room.encrypted` envelope: end-to-end encryption
+hides the clear custom type from the homeserver, so encrypted events must be
+decrypted and filtered client-side. This is unavoidable in E2EE rooms; clear
+rooms retain full server-side filtering.
+
+### Durable run history with `RoomEventLog`
+
+`RoomEventLog` is a companion to `MatrixProvider` for append-only flow history.
+It uses the same Matrix client and room, but history stays in the room timeline
+instead of the Y.Doc:
+
+```typescript
+import {
+  RoomEventLog,
+  type IRoomEventLog,
+} from "@ixo/matrix-crdt";
+
+const history: IRoomEventLog = new RoomEventLog(matrixClient, roomId);
+
+await history.append({
+  runId: "r-0007",
+  blockId: "block-abc",
+  kind: "action.output",
+  payload: {
+    attempt: 1,
+    output: { claimId: "claim-123" },
+  },
+  // Stable and unique within the room. Retries use the same Matrix
+  // transaction id and converge on one event.
+  idempotencyKey: "r-0007:block-abc:attempt-1:output",
+});
+
+const page = await history.read("r-0007", { limit: 50 });
+const nextPage = page.nextToken
+  ? await history.read("r-0007", {
+      from: page.nextToken,
+      limit: 50,
+    })
+  : undefined;
+
+const subscription = history.subscribe(
+  (entry) => {
+    // Server-authenticated audit metadata:
+    console.log(entry.sender, entry.originServerTs, entry.content);
+  },
+  { runId: "r-0007" }
+);
+
+subscription.dispose();
+```
+
+Events use the strict, versioned `ixo.flow.run.event` v1 schema. Supported kinds
+are `run.started`, `run.closed`, `run.cancelled`, `action.started`,
+`action.output`, `action.done`, `action.failed`, `definition.changed`, and
+`log`. Action events require a `blockId` and positive `attempt`; lifecycle and
+definition events are run-level. Payloads must be finite JSON values.
+
+`read()` filters `/messages` to the run-event type, then filters by `runId`
+client-side. It returns newest-first by default; pass `direction: "forward"` for
+oldest-first. Pagination and subscriptions deduplicate both Matrix event ids and
+persisted idempotency keys, including the immediate local echo of an append.
+When `subscribe()` has no `from` token it starts at the live edge and does not
+replay history.
+
 ### WebRTC (experimental)
 
 ixo-matrix-crdt by default throttles sent events every 500ms (for example, to prevent sending an event every keystroke when building a rich text editor). It also does not support Yjs Awareness updates (for presence information, etc) over Matrix.
@@ -174,6 +318,22 @@ npm run build
 
 ```bash
 npm test
+```
+
+Note: `npm test` runs `vitest run --coverage`, which needs `@vitest/coverage-v8`
+(not currently a devDependency), and most suites
+(`MatrixProvider.test.ts`, `MatrixReader.test.ts`, `MatrixMemberReader.test.ts`)
+require a Synapse homeserver on `localhost:8888` started from a `test-server/`
+docker-compose directory that is not part of this repository.
+
+The snapshot, filtered catch-up, and room-event-log suites run anywhere against
+an in-memory fake homeserver:
+
+```bash
+npx vitest run \
+  src/snapshots \
+  src/RoomEventLog.test.ts \
+  src/reader/MatrixReader.filtered.test.ts
 ```
 
 ### Benchmarking

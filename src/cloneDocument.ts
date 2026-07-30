@@ -11,6 +11,24 @@ export interface CloneDocumentResult {
 }
 
 /**
+ * Clones an already-encoded Yjs document update into a Matrix room.
+ *
+ * This is the package boundary-safe form for applications that own their
+ * Y.Doc. Passing bytes avoids coupling consumers to this package's installed
+ * Yjs type identity while preserving the exact document state.
+ */
+export async function cloneDocumentUpdate(
+  sourceUpdate: Uint8Array,
+  matrixClient: MatrixClient,
+  targetRoomId: string,
+  translatorOpts?: MatrixCRDTEventTranslatorOptions
+): Promise<CloneDocumentResult> {
+  const translator = new MatrixCRDTEventTranslator(translatorOpts);
+  await translator.sendUpdate(matrixClient, targetRoomId, sourceUpdate);
+  return { status: "ok", targetRoomId };
+}
+
+/**
  * Clones a Yjs document into a new Matrix room by sending the full document
  * state as a single event. This avoids replaying individual changes and makes
  * the cloned page appear instantly when opened.
@@ -28,8 +46,10 @@ export async function cloneDocument(
   targetRoomId: string,
   translatorOpts?: MatrixCRDTEventTranslatorOptions
 ): Promise<CloneDocumentResult> {
-  const translator = new MatrixCRDTEventTranslator(translatorOpts);
-  const fullState = Y.encodeStateAsUpdate(sourceDoc);
-  await translator.sendUpdate(matrixClient, targetRoomId, fullState);
-  return { status: "ok", targetRoomId };
+  return cloneDocumentUpdate(
+    Y.encodeStateAsUpdate(sourceDoc),
+    matrixClient,
+    targetRoomId,
+    translatorOpts
+  );
 }

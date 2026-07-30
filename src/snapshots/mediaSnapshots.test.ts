@@ -218,8 +218,9 @@ describe("media-backed snapshots (v2)", () => {
 
     const current = await currentClientCatchUp(hs, roomId);
     expect(bodyOf(current.doc)).toEqual("abc");
-    // the newest snapshot of either kind is the v2 one, so it was used
-    expect(hs.downloadCount).toBe(1);
+    // The dual snapshot's legacy half is the newest event of the two and is
+    // readable without a network round trip, so no media was fetched.
+    expect(hs.downloadCount).toBe(0);
 
     const legacy = await legacyCatchUp(client, roomId);
     expect(legacy.error).toBeUndefined();
@@ -373,10 +374,15 @@ describe("degradation instead of an empty document", () => {
     const hs = new FakeHomeserver();
     const roomId = hs.createRoom("!fallback:fake");
     const client = hs.createClient("@alice:fake");
-    const translator = newTranslator({ enableMediaSnapshots: true });
+    // v2 only, so the broken snapshot really is the newest one in the room
+    const translator = newTranslator({
+      enableMediaSnapshots: true,
+      keepLegacyInlineSnapshots: false,
+    });
     const writer = new RoomWriter(hs, client, roomId, translator);
 
     await writer.change((doc) => doc.getText("body").insert(0, "one"));
+    // an older, legacy-only snapshot
     await newTranslator().sendSnapshots(
       client as any,
       roomId,
@@ -384,13 +390,32 @@ describe("degradation instead of an empty document", () => {
       writer.lastEventId
     );
     await writer.change((doc) => doc.getText("body").insert(3, "-two"));
-    const dual = await writer.snapshot();
-    hs.brokenMedia.add(dual.v2.mxcUrl!);
+    const v2Only = await writer.snapshot();
+    expect(v2Only.legacy.sent).toBe(false);
+    hs.brokenMedia.add(v2Only.v2.mxcUrl!);
     await writer.change((doc) => doc.getText("body").insert(7, "-three"));
 
     const { doc, degradations } = await currentClientCatchUp(hs, roomId);
     expect(degradations).toHaveLength(1);
+    expect(degradations[0].reason).toBe("fetch_failed");
     expect(bodyOf(doc)).toEqual("one-two-three");
+  });
+
+  it("does not fetch an older v2 blob once a newer readable snapshot was found", async () => {
+    const hs = new FakeHomeserver();
+    const roomId = hs.createRoom("!nowastedfetch:fake");
+    const client = hs.createClient("@alice:fake");
+    const translator = newTranslator({ enableMediaSnapshots: true });
+    const writer = new RoomWriter(hs, client, roomId, translator);
+
+    await writer.change((doc) => doc.getText("body").insert(0, "one"));
+    await writer.snapshot(); // v2 + legacy
+    await writer.change((doc) => doc.getText("body").insert(3, "-two"));
+    await writer.snapshot(); // v2 + legacy again
+
+    const { doc } = await currentClientCatchUp(hs, roomId);
+    expect(bodyOf(doc)).toEqual("one-two");
+    expect(hs.downloadCount).toBe(0);
   });
 
   it("degrades when the blob does not match the advertised state vector", async () => {

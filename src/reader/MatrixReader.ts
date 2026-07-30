@@ -276,6 +276,14 @@ export class MatrixReader extends lifecycle.Disposable {
             ret.push(event);
           }
         } else if (this.translator.isSnapshotV2Event(event)) {
+          if (lastEventInSnapshot) {
+            // A newer readable snapshot (of either kind) was already found, so
+            // this older one adds nothing. Skipping matters: during the
+            // dual-write window the parallel legacy inline snapshot is the newer
+            // event, which means the (potentially multi-megabyte) media fetch is
+            // avoided entirely whenever the document still fits inline.
+            continue;
+          }
           const resolved = await this.resolveSnapshotV2Event(event);
           if (!resolved) {
             // unreadable: keep paginating backwards

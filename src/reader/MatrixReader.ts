@@ -7,6 +7,7 @@ import {
 } from "matrix-js-sdk";
 import { event, lifecycle } from "vscode-lib";
 import { MatrixCRDTEventTranslator } from "../MatrixCRDTEventTranslator";
+import { attachResolvedUpdate } from "../snapshots/snapshotV2";
 
 const PEEK_POLL_TIMEOUT = 30 * 1000;
 const PEEK_POLL_ERROR_TIMEOUT = 30 * 1000;
@@ -16,6 +17,39 @@ const DEFAULT_OPTIONS = {
 };
 
 export type MatrixReaderOptions = Partial<typeof DEFAULT_OPTIONS>;
+
+export type SnapshotDegradationReason =
+  | "invalid_pointer"
+  | "fetch_failed";
+
+/**
+ * Emitted when a snapshot event was found but could not be used. The catch-up
+ * continues paginating backwards (to an older readable snapshot, or to room
+ * genesis) instead of treating the unreadable snapshot as complete state.
+ */
+export interface SnapshotDegradation {
+  eventId: string | undefined;
+  eventType: string | undefined;
+  reason: SnapshotDegradationReason;
+  mxcUrl?: string;
+  error?: any;
+}
+
+/**
+ * Thrown when snapshots degraded *and* no readable update events were found, so
+ * the only thing we could hand back would be an empty document. An empty
+ * document must never be presented as the room's state.
+ */
+export class SnapshotUnavailableError extends Error {
+  public constructor(public readonly degradations: SnapshotDegradation[]) {
+    super(
+      `matrix-crdt: catch-up found ${degradations.length} unreadable snapshot(s) ` +
+        `and no readable document updates; refusing to report an empty document ` +
+        `as the room state`
+    );
+    this.name = "SnapshotUnavailableError";
+  }
+}
 
 /**
  * A helper class to read messages from Matrix using a MatrixClient,
@@ -36,6 +70,20 @@ export class MatrixReader extends lifecycle.Disposable {
     events: any[];
     shouldSendSnapshot: boolean;
   }> = this._onEvents.event;
+
+  private readonly _onSnapshotDegraded = this._register(
+    new event.Emitter<SnapshotDegradation>()
+  );
+  /** Fires for every snapshot that was found but could not be used. */
+  public readonly onSnapshotDegraded: event.Event<SnapshotDegradation> =
+    this._onSnapshotDegraded.event;
+
+  private _snapshotDegradations: SnapshotDegradation[] = [];
+
+  /** Snapshots that could not be read during the last catch-up. */
+  public get snapshotDegradations(): readonly SnapshotDegradation[] {
+    return this._snapshotDegradations;
+  }
 
   private readonly opts: typeof DEFAULT_OPTIONS;
 
@@ -108,7 +156,11 @@ export class MatrixReader extends lifecycle.Disposable {
           // we use % to make sure we retry this on the next SNAPSHOT_INTERVAL
           shouldSendSnapshot = true;
         }
-      } else if (this.translator.isSnapshotEvent(event)) {
+      } else if (this.translator.isAnySnapshotEvent(event)) {
+        // v2 snapshots reset the counter too: someone just published a
+        // snapshot, so this client should not publish a redundant one. Note we
+        // deliberately do NOT fetch the media blob for a live snapshot — we are
+        // already up to date via update events.
         this.messagesSinceSnapshot = 0;
         shouldSendSnapshot = false;
       }
@@ -189,8 +241,15 @@ export class MatrixReader extends lifecycle.Disposable {
    *
    * This methods paginates back until
    * - (a) all events in the room have been received. In that case we return all events.
-   * - (b) it encounters a snapshot. In this case we return the snapshot event and all update events
-   *        that occur after that latest snapshot
+   * - (b) it encounters a *readable* snapshot. In this case we return the snapshot event and all
+   *        update events that occur after that latest snapshot
+   *
+   * Media-backed (v2) snapshots are resolved here — the blob is fetched and
+   * attached to the returned event — because the decision "is this snapshot
+   * usable, or must I keep walking backwards?" is a pagination decision.
+   * An unreadable snapshot (bad pointer, failed fetch, corrupt blob) is skipped
+   * entirely: it does not stop the walk and it does not set last_event_id, so
+   * catch-up falls back to an older readable snapshot or to replaying updates.
    *
    * (if typeFilter is set we retrieve all events of that type. TODO: can we deprecate this param?)
    */
@@ -199,13 +258,14 @@ export class MatrixReader extends lifecycle.Disposable {
     let token = "";
     let hasNextPage = true;
     let lastEventInSnapshot: string | undefined;
+    this._snapshotDegradations = [];
     while (hasNextPage) {
       const res = await this.matrixClient.createMessagesRequest(
         this.roomId,
         token,
         30,
         Direction.Backward
-        // TODO: filter?
+        // TODO: filter? (see IXO-4117 — derive from translator.readEventTypes)
       );
 
       const events = await this.decryptRawEventsIfNecessary(res.chunk);
@@ -215,6 +275,14 @@ export class MatrixReader extends lifecycle.Disposable {
           if (event.type === typeFilter) {
             ret.push(event);
           }
+        } else if (this.translator.isSnapshotV2Event(event)) {
+          const resolved = await this.resolveSnapshotV2Event(event);
+          if (!resolved) {
+            // unreadable: keep paginating backwards
+            continue;
+          }
+          ret.push(resolved);
+          lastEventInSnapshot = event.content.last_event_id;
         } else if (this.translator.isSnapshotEvent(event)) {
           ret.push(event);
           lastEventInSnapshot = event.content.last_event_id;
@@ -223,7 +291,7 @@ export class MatrixReader extends lifecycle.Disposable {
             if (!this.latestToken) {
               this.latestToken = res.start;
             }
-            return ret.reverse();
+            return this.finishCatchUp(ret);
           }
           this.messagesSinceSnapshot++;
           ret.push(event);
@@ -235,6 +303,67 @@ export class MatrixReader extends lifecycle.Disposable {
         this.latestToken = res.start;
       }
       hasNextPage = !!(res.start !== res.end && res.end);
+    }
+    return this.finishCatchUp(ret);
+  }
+
+  /**
+   * Fetch the document blob for a v2 snapshot pointer.
+   * Returns the event with the update bytes attached, or undefined when the
+   * snapshot is unreadable (a degradation is reported in that case).
+   */
+  private async resolveSnapshotV2Event(event: any): Promise<any | undefined> {
+    const pointer = this.translator.parseSnapshotV2Pointer(event);
+    if (!pointer) {
+      this.reportSnapshotDegradation({
+        eventId: event?.event_id,
+        eventType: event?.type,
+        reason: "invalid_pointer",
+      });
+      return undefined;
+    }
+    try {
+      const update = await this.translator.fetchSnapshotV2Update(
+        this.matrixClient,
+        pointer
+      );
+      return attachResolvedUpdate(event, update);
+    } catch (e) {
+      this.reportSnapshotDegradation({
+        eventId: event?.event_id,
+        eventType: event?.type,
+        reason: "fetch_failed",
+        mxcUrl: pointer.mxcUrl,
+        error: e,
+      });
+      return undefined;
+    }
+  }
+
+  private reportSnapshotDegradation(degradation: SnapshotDegradation) {
+    this._snapshotDegradations.push(degradation);
+    console.warn(
+      `matrix-crdt: ignoring unreadable snapshot (${degradation.reason})`,
+      degradation.eventType,
+      degradation.eventId,
+      degradation.mxcUrl,
+      degradation.error
+    );
+    this._onSnapshotDegraded.fire(degradation);
+  }
+
+  /**
+   * Guard the one outcome that must never happen: reporting an empty document
+   * as the room's state because the only snapshot we found was unreadable.
+   */
+  private finishCatchUp(ret: any[]) {
+    if (this._snapshotDegradations.length) {
+      const hasReadableUpdate = ret.some(
+        (e) => this.translator.getUpdateBytes(e) !== undefined
+      );
+      if (!hasReadableUpdate) {
+        throw new SnapshotUnavailableError([...this._snapshotDegradations]);
+      }
     }
     return ret.reverse();
   }

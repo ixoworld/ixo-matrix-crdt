@@ -11,7 +11,10 @@ import {
   FakeMatrixClient,
   MAX_EVENT_SIZE,
 } from "../test-utils/fakeHomeserver";
-import { legacyCatchUp } from "../test-utils/legacyClient";
+import {
+  legacyCatchUp,
+  legacyProcessIncomingEvents,
+} from "../test-utils/legacyClient";
 import { SNAPSHOT_V2_EVENT_TYPE } from "./snapshotV2";
 
 const LEGACY_SNAPSHOT_EVENT_TYPE = "matrix-crdt.doc_snapshot";
@@ -320,6 +323,24 @@ describe("old-build clients in a room containing v2 snapshots", () => {
     expect(bodyOf(legacy.doc).startsWith("PREFIX:")).toBe(true);
     expect(bodyOf(legacy.doc).length).toBe(200007);
   }, 30000);
+
+  it("ignores live v2 events arriving through its poll loop", async () => {
+    const hs = new FakeHomeserver();
+    const roomId = hs.createRoom("!legacylive:fake");
+    const client = hs.createClient("@alice:fake");
+    const translator = newTranslator({ enableMediaSnapshots: true });
+    const writer = new RoomWriter(hs, client, roomId, translator);
+    await writer.change((doc) => doc.getText("body").insert(0, "hello"));
+    await writer.snapshot();
+
+    // The old build's live event filter is the second place a v2 event could
+    // hurt it: an unrecognized type must be dropped, not base64-decoded.
+    const doc = new Y.Doc();
+    expect(() =>
+      legacyProcessIncomingEvents(doc, hs.getRoom(roomId).events)
+    ).not.toThrow();
+    expect(bodyOf(doc)).toEqual("hello");
+  });
 
   it("would be broken if the media pointer used the legacy snapshot event type", async () => {
     const hs = new FakeHomeserver();

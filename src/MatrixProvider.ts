@@ -109,6 +109,8 @@ export class MatrixProvider extends lifecycle.Disposable {
 
 	private _roomIsEncrypted: boolean | undefined;
 
+	private roomEncryptionRequested = false;
+
 	private readonly opts: typeof DEFAULT_OPTIONS;
 
 	public readonly onDocumentAvailable: event.Event<void> = this._onDocumentAvailable.event;
@@ -254,6 +256,7 @@ export class MatrixProvider extends lifecycle.Disposable {
 			// A snapshot _could_ also contain events after last_event_id,
 			// for example if the local document contains changes that haven't been flushed to Matrix yet.
 
+			this.ensureRoomEncryptionKnown();
 			this.translator
 				.sendSnapshots(this.matrixClient, this._roomId!, update, lastEvent.event_id, {
 					roomIsEncrypted: this._roomIsEncrypted,
@@ -270,6 +273,28 @@ export class MatrixProvider extends lifecycle.Disposable {
 		}
 		return update;
 	};
+
+	/**
+	 * Room encryption only affects which inline-snapshot ceiling applies (megolm
+	 * ciphertext is base64, so the 4/3 expansion is paid a second time). It is
+	 * resolved lazily and cached: doing it during initialize() would add an HTTP
+	 * round trip to every document open, while snapshots are sent rarely and by
+	 * one elected client. The first snapshot in a process therefore uses the
+	 * plaintext ceiling, exactly as before this option existed.
+	 */
+	private ensureRoomEncryptionKnown() {
+		if (this._roomIsEncrypted !== undefined || !this._roomId || this.roomEncryptionRequested) {
+			return;
+		}
+		this.roomEncryptionRequested = true;
+		detectRoomEncryption(this.matrixClient, this._roomId)
+			.then(result => {
+				this._roomIsEncrypted = result !== 'unencrypted';
+			})
+			.catch(() => {
+				this.roomEncryptionRequested = false;
+			});
+	}
 
 	/**
 	 * Experimental; we can use WebRTC to sync updates instantly over WebRTC.
@@ -367,16 +392,6 @@ export class MatrixProvider extends lifecycle.Disposable {
 				throw new Error('error receiving room id');
 			}
 			console.log('room resolved', this._roomId);
-			// Only affects which inline-snapshot ceiling applies (megolm base64
-			// costs another 4/3), so it's resolved in the background rather than
-			// adding a round trip to every initialize().
-			detectRoomEncryption(this.matrixClient, this._roomId)
-				.then(result => {
-					this._roomIsEncrypted = result !== 'unencrypted';
-				})
-				.catch(() => {
-					/* leave undefined; sendSnapshots falls back to the plaintext ceiling */
-				});
 			await this.throttledWriter.initialize(this._roomId);
 		} catch (e: any) {
 			let timeout = 5 * 1000;

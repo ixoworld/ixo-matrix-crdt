@@ -1,3 +1,24 @@
+# [1.3.0](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.5...v1.3.0) (2026-07-30)
+
+
+### Bug Fixes
+
+* **test:** make test setup loadable and keep crypto.subtle available ([90f25aa](https://github.com/ixoworld/ixo-matrix-crdt/commit/90f25aad58a5304c7f7b0efb999bdb428c1cc3e1))
+* **webrtc:** copy crypto inputs into ArrayBuffers ([223df7c](https://github.com/ixoworld/ixo-matrix-crdt/commit/223df7cec1dc4a6a903d660a4aa31f50fd95d4c7))
+
+
+### Features
+
+* **cloning:** accept encoded document updates ([cf518a2](https://github.com/ixoworld/ixo-matrix-crdt/commit/cf518a239c772f186b98f3c070c81b84c31b71a0))
+* **history:** add durable Matrix run event log ([5e2876c](https://github.com/ixoworld/ixo-matrix-crdt/commit/5e2876ce96bfc69e184efd709b004d557259b4ec))
+* **snapshots:** media-backed snapshots on a new event type, write path off by default ([c69ac01](https://github.com/ixoworld/ixo-matrix-crdt/commit/c69ac01f3af2610210627b4c80f3f09dfca5712e))
+
+
+### Performance Improvements
+
+* **snapshots:** resolve room encryption lazily instead of on every init ([31bba41](https://github.com/ixoworld/ixo-matrix-crdt/commit/31bba41d417248643bc787e546313c8e1a84ffbf))
+* **snapshots:** skip the media fetch when a newer readable snapshot exists ([6b6121b](https://github.com/ixoworld/ixo-matrix-crdt/commit/6b6121bd41b4dc38c0daf574a65980893f19a9c0))
+
 ## [1.2.5](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.4...v1.2.5) (2026-06-03)
 
 

@@ -73,11 +73,15 @@ async function validateOneWaySync(
   );
   expect(bob.doc.getMap("test2")).toBeUndefined;
 
-  // send an update from provider and validate sync
+  // send an update from provider and validate sync.
+  // Subscribe BEFORE triggering the write: on a low-latency homeserver bob's
+  // long-poll can deliver the event before alice's write ack resolves, and a
+  // one-shot subscription taken afterwards would wait forever.
   console.log("Alice sending change", alice.client.credentials.userId);
+  const bobReceived = event.Event.toPromise(bob.provider.onReceivedEvents);
   alice.doc.getMap("test2").set("key", 1);
   await alice.provider.waitForFlush();
-  await event.Event.toPromise(bob.provider.onReceivedEvents);
+  await bobReceived;
   expect(bob.doc.getMap("test2").get("key")).toBe(1);
 
   // validate bob.provider is a read-only client (because it's a guestclient)
@@ -109,19 +113,24 @@ async function validateTwoWaySync(
   );
   expect(bob.doc.getMap("test2")).toBeUndefined;
 
-  // send an update from provider and validate sync
+  // send an update from provider and validate sync.
+  // Subscribe BEFORE triggering each write: on a low-latency homeserver the
+  // receiving side's long-poll can deliver the event before the writer's ack
+  // resolves, and a one-shot subscription taken afterwards waits forever.
   console.log("Alice sending change", alice.client.credentials.userId);
+  const bobReceived = event.Event.toPromise(bob.provider.onReceivedEvents);
   alice.doc.getMap("test2").set("key", 1);
   await alice.provider.waitForFlush();
-  await event.Event.toPromise(bob.provider.onReceivedEvents);
+  await bobReceived;
   expect(bob.doc.getMap("test2").get("key")).toBe(1);
 
   // validate bob can write
   console.log("Bob sending change", bob.client.credentials.userId);
   expect(bob.provider.canWrite).toBe(true);
+  const aliceReceived = event.Event.toPromise(alice.provider.onReceivedEvents);
   bob.doc.getMap("test3").set("key", 1);
   await bob.provider.waitForFlush();
-  await event.Event.toPromise(alice.provider.onReceivedEvents);
+  await aliceReceived;
   expect(alice.doc.getMap("test3").get("key")).toBe(1);
   expect(bob.provider.canWrite).toBe(true);
 

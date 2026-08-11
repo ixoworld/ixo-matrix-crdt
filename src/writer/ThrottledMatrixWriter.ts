@@ -86,6 +86,7 @@ export class ThrottledMatrixWriter extends lifecycle.Disposable {
     const merged = Y.mergeUpdates(this.pendingUpdates);
     this.pendingUpdates = [];
 
+    let retryImmediately = false;
     try {
       console.log("Sending updates");
       await this.translator.sendUpdate(this.matrixClient, this.roomId, merged);
@@ -111,6 +112,20 @@ export class ThrottledMatrixWriter extends lifecycle.Disposable {
           this._onSentAllEvents.fire();
           return;
         }
+
+        try {
+          // make sure we're in the room, so we can send updates
+          // guests can't / won't join, so MatrixProvider won't send updates
+          // for this room. Restores upstream behavior this fork had dropped:
+          // without the join, a writer that was never in the room can only
+          // retry the same forbidden send every retryIfForbiddenInterval,
+          // forever.
+          await this.matrixClient.joinRoom(this.roomId);
+          console.log("joined room", this.roomId);
+          retryImmediately = true;
+        } catch (joinError) {
+          console.warn("failed to join room", joinError);
+        }
       } else {
         console.error("error sending updates", e);
       }
@@ -125,9 +140,11 @@ export class ThrottledMatrixWriter extends lifecycle.Disposable {
         () => {
           this.throttledFlushUpdatesToMatrix();
         },
-        this.canWrite
-          ? this.opts.flushInterval
-          : this.opts.retryIfForbiddenInterval
+        retryImmediately
+          ? 0
+          : this.canWrite
+            ? this.opts.flushInterval
+            : this.opts.retryIfForbiddenInterval
       );
     } else {
       console.log("_onSentAllEvents");

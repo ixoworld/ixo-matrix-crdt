@@ -255,7 +255,59 @@ export class MatrixReader extends lifecycle.Disposable {
    * (if typeFilter is set we retrieve all events of that type. TODO: can we deprecate this param?)
    */
   public async getInitialDocumentUpdateEvents(typeFilter?: string) {
-    let ret: any[] = [];
+    const ret: any[] = [];
+    await this.walkInitialDocumentUpdateEvents(typeFilter, (events) => {
+      ret.push(...events);
+    });
+    return this.finishCatchUp(ret);
+  }
+
+  /**
+   * Streaming variant of `getInitialDocumentUpdateEvents` for CRDT catch-up.
+   *
+   * The accumulating variant holds the entire post-snapshot event history in
+   * memory before the caller applies a single byte of it. For rooms with a
+   * long history (or with unreadable snapshots, which force the walk back to
+   * room genesis) that transient peak can exceed the process heap. This
+   * variant hands each page of relevant events to `onEvents` as it is fetched
+   * and retains nothing, so peak memory is one page plus whatever the caller
+   * builds.
+   *
+   * Events are delivered in pagination order (newest first). That is safe for
+   * Yjs consumers — CRDT updates commute — but callers that need chronological
+   * order must use the accumulating variant.
+   *
+   * Throws `SnapshotUnavailableError` under the same condition as the
+   * accumulating variant: a degraded snapshot with no readable update bytes
+   * anywhere in the walk.
+   */
+  public async streamInitialDocumentUpdateEvents(
+    onEvents: (events: any[]) => void | Promise<void>
+  ): Promise<void> {
+    let hasReadableUpdate = false;
+    await this.walkInitialDocumentUpdateEvents(undefined, async (events) => {
+      if (!hasReadableUpdate) {
+        hasReadableUpdate = events.some(
+          (event) => this.translator.getUpdateBytes(event) !== undefined
+        );
+      }
+      await onEvents(events);
+    });
+    if (this._snapshotDegradations.length && !hasReadableUpdate) {
+      throw new SnapshotUnavailableError([...this._snapshotDegradations]);
+    }
+  }
+
+  /**
+   * Shared backward pagination walk. Emits each page's relevant events via
+   * `emit` and stops at the newest readable snapshot boundary (or room
+   * genesis). Ordering, token bookkeeping, snapshot election counting and
+   * degradation reporting are identical for both public variants.
+   */
+  private async walkInitialDocumentUpdateEvents(
+    typeFilter: string | undefined,
+    emit: (events: any[]) => void | Promise<void>
+  ): Promise<void> {
     let token = "";
     let hasNextPage = true;
     let lastEventInSnapshot: string | undefined;
@@ -274,11 +326,12 @@ export class MatrixReader extends lifecycle.Disposable {
       );
 
       const events = await this.decryptRawEventsIfNecessary(res.chunk);
+      const page: any[] = [];
 
       for (let event of events) {
         if (typeFilter) {
           if (event.type === typeFilter) {
-            ret.push(event);
+            page.push(event);
           }
         } else if (this.translator.isSnapshotV2Event(event)) {
           if (lastEventInSnapshot) {
@@ -294,21 +347,28 @@ export class MatrixReader extends lifecycle.Disposable {
             // unreadable: keep paginating backwards
             continue;
           }
-          ret.push(resolved);
+          page.push(resolved);
           lastEventInSnapshot = event.content.last_event_id;
         } else if (this.translator.isSnapshotEvent(event)) {
-          ret.push(event);
+          page.push(event);
           lastEventInSnapshot = event.content.last_event_id;
         } else if (this.translator.isUpdateEvent(event)) {
           if (lastEventInSnapshot && lastEventInSnapshot === event.event_id) {
             if (!this.latestToken) {
               this.latestToken = res.start;
             }
-            return this.finishCatchUp(ret);
+            if (page.length) {
+              await emit(page);
+            }
+            return;
           }
           this.messagesSinceSnapshot++;
-          ret.push(event);
+          page.push(event);
         }
+      }
+
+      if (page.length) {
+        await emit(page);
       }
 
       token = res.end || "";
@@ -317,7 +377,6 @@ export class MatrixReader extends lifecycle.Disposable {
       }
       hasNextPage = !!(res.start !== res.end && res.end);
     }
-    return this.finishCatchUp(ret);
   }
 
   /**

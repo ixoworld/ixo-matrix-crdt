@@ -459,6 +459,14 @@ export class MatrixProvider extends lifecycle.Disposable {
 
 	/**
 	 * Get all initial events from the room + start polling
+	 *
+	 * Catch-up is streamed: each page of history is applied to a scratch
+	 * Y.Doc as it arrives and then dropped. The old path accumulated the raw
+	 * event list, a decoded copy of every update, one merged mega-update AND
+	 * the live doc at the same time — for long-history rooms that transient
+	 * peak alone could exceed the process heap. The scratch doc compacts as
+	 * it applies, and the compacted server state is what flows onward, so the
+	 * returned update is equivalent for every downstream comparison.
 	 */
 	private async initializeReader() {
 		if (this.reader) {
@@ -472,9 +480,38 @@ export class MatrixProvider extends lifecycle.Disposable {
 
 		this._register(this.reader.onEvents((e: any) => this.processIncomingEvents(e.events, e.shouldSendSnapshot)));
 		this._register(this.reader.onSnapshotDegraded((d: SnapshotDegradation) => this._onSnapshotDegraded.fire(d)));
-		const events = await this.reader.getInitialDocumentUpdateEvents();
-		this.reader.startPolling();
-		return this.processIncomingEvents(events);
+
+		const serverDoc = new Y.Doc();
+		let sawRemoteEvent = false;
+		try {
+			await this.reader.streamInitialDocumentUpdateEvents(events => {
+				for (const event of events) {
+					if (!this.translator.isUpdateEvent(event) && !this.translator.isAnySnapshotEvent(event)) {
+						continue;
+					}
+					const bytes = this.translator.getUpdateBytes(event);
+					if (!bytes) {
+						continue;
+					}
+					this.totalEventsReceived++;
+					if (event.user_id !== this.matrixClient.credentials.userId) {
+						sawRemoteEvent = true;
+					}
+					Y.applyUpdate(serverDoc, bytes);
+				}
+			});
+			this.reader.startPolling();
+
+			const update = Y.encodeStateAsUpdate(serverDoc);
+			// Apply latest state from server
+			Y.applyUpdate(this.doc, update, this);
+			if (sawRemoteEvent) {
+				this._onReceivedEvents.fire();
+			}
+			return update;
+		} finally {
+			serverDoc.destroy();
+		}
 	}
 
 	/**

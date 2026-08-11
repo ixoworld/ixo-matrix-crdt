@@ -1,3 +1,15 @@
+## [1.3.1](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.3.0...v1.3.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **writer:** restore auto-join and immediate retry on forbidden writes ([b5b0cec](https://github.com/ixoworld/ixo-matrix-crdt/commit/b5b0cec7111acdb774ab854ada16ab05d6c6eecb))
+
+
+### Performance Improvements
+
+* stream catch-up events into the doc instead of accumulating history ([d1ce39f](https://github.com/ixoworld/ixo-matrix-crdt/commit/d1ce39f6bd5f0c2a3d599f2a8e5f83e6ced23324))
+
 # [1.3.0](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.2.5...v1.3.0) (2026-07-30)
 
 

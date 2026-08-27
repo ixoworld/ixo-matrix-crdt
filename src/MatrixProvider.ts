@@ -15,6 +15,30 @@ import { MatrixCRDTEventTranslator, MatrixCRDTEventTranslatorOptions } from './M
 import { detectRoomEncryption, MediaTransport } from './snapshots/mediaTransport';
 import { SnapshotDegradation } from './reader/MatrixReader';
 
+/**
+ * Apply catch-up updates collected from a backwards timeline walk
+ * (newest-first) to a doc in chronological (oldest-first) order.
+ *
+ * Chronological order keeps `Y.applyUpdate` linear: each update's causal
+ * predecessors are already integrated, so nothing lands in Yjs's
+ * pending-structs buffer. Applying newest-first instead re-encodes that
+ * buffer on every call — quadratic in history length.
+ *
+ * Consumes the input array: each entry is released as soon as it has been
+ * applied, so peak memory decays as the doc compacts.
+ *
+ * Exported for regression tests only — not part of the public API.
+ */
+export function applyUpdatesChronologically(doc: Y.Doc, updatesNewestFirst: (Uint8Array | undefined)[]): void {
+	for (let i = updatesNewestFirst.length - 1; i >= 0; i--) {
+		const bytes = updatesNewestFirst[i];
+		updatesNewestFirst[i] = undefined;
+		if (bytes) {
+			Y.applyUpdate(doc, bytes);
+		}
+	}
+}
+
 const DEFAULT_OPTIONS = {
 	enableExperimentalWebrtcSync: false,
 	enableAwareness: false,
@@ -460,13 +484,24 @@ export class MatrixProvider extends lifecycle.Disposable {
 	/**
 	 * Get all initial events from the room + start polling
 	 *
-	 * Catch-up is streamed: each page of history is applied to a scratch
-	 * Y.Doc as it arrives and then dropped. The old path accumulated the raw
-	 * event list, a decoded copy of every update, one merged mega-update AND
-	 * the live doc at the same time — for long-history rooms that transient
-	 * peak alone could exceed the process heap. The scratch doc compacts as
-	 * it applies, and the compacted server state is what flows onward, so the
-	 * returned update is equivalent for every downstream comparison.
+	 * Catch-up streams each page of history, keeps only the decoded update
+	 * bytes, and drops the raw events immediately. Once the walk completes,
+	 * the updates are applied to a scratch Y.Doc in CHRONOLOGICAL order (the
+	 * walk paginates backwards, so the collected list is reversed first).
+	 *
+	 * The order matters more than it looks: applying updates newest-first
+	 * parks every update in Yjs's pending-structs buffer (its causal
+	 * predecessors haven't been applied yet), and Yjs re-encodes that entire
+	 * buffer on every subsequent applyUpdate call — quadratic time and
+	 * allocation churn in the length of the post-snapshot history. For a
+	 * long-history room that wedges the event loop and can OOM the process,
+	 * which is exactly what streaming was introduced to prevent. Oldest-first
+	 * application integrates every update on arrival and stays linear.
+	 *
+	 * Peak memory is the decoded update payloads plus the compacted scratch
+	 * doc — still far below the old accumulating path, which held the raw
+	 * event list, a decoded copy of every update, one merged mega-update and
+	 * the live doc simultaneously.
 	 */
 	private async initializeReader() {
 		if (this.reader) {
@@ -481,25 +516,28 @@ export class MatrixProvider extends lifecycle.Disposable {
 		this._register(this.reader.onEvents((e: any) => this.processIncomingEvents(e.events, e.shouldSendSnapshot)));
 		this._register(this.reader.onSnapshotDegraded((d: SnapshotDegradation) => this._onSnapshotDegraded.fire(d)));
 
-		const serverDoc = new Y.Doc();
+		const updatesNewestFirst: (Uint8Array | undefined)[] = [];
 		let sawRemoteEvent = false;
-		try {
-			await this.reader.streamInitialDocumentUpdateEvents(events => {
-				for (const event of events) {
-					if (!this.translator.isUpdateEvent(event) && !this.translator.isAnySnapshotEvent(event)) {
-						continue;
-					}
-					const bytes = this.translator.getUpdateBytes(event);
-					if (!bytes) {
-						continue;
-					}
-					this.totalEventsReceived++;
-					if (event.user_id !== this.matrixClient.credentials.userId) {
-						sawRemoteEvent = true;
-					}
-					Y.applyUpdate(serverDoc, bytes);
+		await this.reader.streamInitialDocumentUpdateEvents(events => {
+			for (const event of events) {
+				if (!this.translator.isUpdateEvent(event) && !this.translator.isAnySnapshotEvent(event)) {
+					continue;
 				}
-			});
+				const bytes = this.translator.getUpdateBytes(event);
+				if (!bytes) {
+					continue;
+				}
+				this.totalEventsReceived++;
+				if (event.user_id !== this.matrixClient.credentials.userId) {
+					sawRemoteEvent = true;
+				}
+				updatesNewestFirst.push(bytes);
+			}
+		});
+
+		const serverDoc = new Y.Doc();
+		try {
+			applyUpdatesChronologically(serverDoc, updatesNewestFirst);
 			this.reader.startPolling();
 
 			const update = Y.encodeStateAsUpdate(serverDoc);

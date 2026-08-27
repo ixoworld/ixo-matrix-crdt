@@ -273,9 +273,14 @@ export class MatrixReader extends lifecycle.Disposable {
    * and retains nothing, so peak memory is one page plus whatever the caller
    * builds.
    *
-   * Events are delivered in pagination order (newest first). That is safe for
-   * Yjs consumers — CRDT updates commute — but callers that need chronological
-   * order must use the accumulating variant.
+   * Events are delivered in pagination order (newest first). CRDT updates
+   * commute, so the final document state is order-independent — but do NOT
+   * feed them to `Y.applyUpdate` in this order: newest-first application
+   * parks every update in Yjs's pending-structs buffer, which is re-encoded
+   * on every call (quadratic in history length). Collect the update bytes
+   * and apply them oldest-first once the walk completes (see
+   * `applyUpdatesChronologically` in MatrixProvider), or use the
+   * accumulating variant, which returns chronological order.
    *
    * Throws `SnapshotUnavailableError` under the same condition as the
    * accumulating variant: a degraded snapshot with no readable update bytes

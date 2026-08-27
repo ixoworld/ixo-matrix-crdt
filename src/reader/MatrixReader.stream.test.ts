@@ -2,6 +2,7 @@ import type { MatrixClient } from "matrix-js-sdk";
 import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { MatrixCRDTEventTranslator } from "../MatrixCRDTEventTranslator";
+import { applyUpdatesChronologically } from "../MatrixProvider";
 import { encodeBase64 } from "../util/olmlib";
 import { MatrixReader, SnapshotUnavailableError } from "./MatrixReader";
 
@@ -156,6 +157,51 @@ describe("streamInitialDocumentUpdateEvents", () => {
       (client.createMessagesRequest as ReturnType<typeof vi.fn>).mock.calls
         .length
     ).toBe(1);
+  });
+
+  it("rebuilds a causally-dependent history when collected and applied chronologically", async () => {
+    // Sequential edits to ONE doc: each update depends on the previous one,
+    // unlike the independent-doc fixtures above. This mirrors a real room
+    // timeline and would catch a consumer applying the newest-first stream
+    // order directly (the catch-up OOM regression).
+    const sourceDoc = new Y.Doc();
+    const updates: Uint8Array[] = [];
+    sourceDoc.on("update", (update: Uint8Array) => updates.push(update));
+    const sourceMap = sourceDoc.getMap("m");
+    for (let i = 0; i < 90; i++) {
+      sourceMap.set(`k${i}`, i);
+    }
+    const expected = sourceMap.toJSON();
+    sourceDoc.destroy();
+
+    // Newest page first, newest event first within each page (Direction.Backward).
+    const chronological = updates.map((update, i) =>
+      updateEvent(`$u${i}`, update)
+    );
+    const newestFirst = [...chronological].reverse();
+    const pages: any[][] = [];
+    for (let i = 0; i < newestFirst.length; i += 30) {
+      pages.push(newestFirst.slice(i, i + 30));
+    }
+
+    const translator = new MatrixCRDTEventTranslator();
+    const collected: (Uint8Array | undefined)[] = [];
+    await makeReader(fakeClient(pages)).streamInitialDocumentUpdateEvents(
+      (events) => {
+        for (const event of events) {
+          collected.push(translator.getUpdateBytes(event));
+        }
+      }
+    );
+
+    const doc = new Y.Doc();
+    doc.on("afterTransaction", () => {
+      expect((doc.store as any).pendingStructs).toBeNull();
+    });
+    applyUpdatesChronologically(doc, collected);
+
+    expect(doc.getMap("m").toJSON()).toEqual(expected);
+    doc.destroy();
   });
 
   it("throws SnapshotUnavailableError when only unreadable snapshots exist", async () => {

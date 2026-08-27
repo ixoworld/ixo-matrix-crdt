@@ -1,3 +1,10 @@
+## [1.3.2](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.3.1...v1.3.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* apply streamed catch-up updates chronologically, not newest-first ([490e3e9](https://github.com/ixoworld/ixo-matrix-crdt/commit/490e3e9ca34bdac63455ba42573f455fc093c023)), closes [#9](https://github.com/ixoworld/ixo-matrix-crdt/issues/9)
+
 ## [1.3.1](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.3.0...v1.3.1) (2026-08-11)
 
 

@@ -1,3 +1,10 @@
+## [1.3.3](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.3.2...v1.3.3) (2026-09-21)
+
+
+### Bug Fixes
+
+* accept the authority a run was closed under ([4e1eaac](https://github.com/ixoworld/ixo-matrix-crdt/commit/4e1eaacab62a6469fb88cee3231e7ad78cf5c6c9))
+
 ## [1.3.2](https://github.com/ixoworld/ixo-matrix-crdt/compare/v1.3.1...v1.3.2) (2026-08-27)
 
 

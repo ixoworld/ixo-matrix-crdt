@@ -213,6 +213,67 @@ describe("run event v1 schema", () => {
       })
     ).toBeUndefined();
   });
+
+  it("carries the authority a run was closed under", () => {
+    // A run closed under a signed invocation names an actor who need not be
+    // the Matrix sender, and carries the invocation itself. Both were rejected
+    // as unknown fields, so closing such a run failed with "run.closed payload
+    // contains unknown field \"actorDid\"" and no run could be closed at all.
+    const common = {
+      v: RUN_EVENT_SCHEMA_VERSION,
+      runId: "r-0007",
+      ts: 1_785_302_400_000,
+    } as const;
+    const authorization = {
+      actorDid: "did:ixo:ixo1lmyh8hwu04d2f3df624qktq24pf9ckq0efka8d",
+      invocationCid: "bafy-close",
+      inputDigest: "sha256:abc",
+    };
+
+    expect(
+      parseRunEventContent({
+        ...common,
+        kind: "run.closed",
+        idempotencyKey: "run-closed-authorized",
+        payload: {
+          invocationCid: "bafy-close",
+          actorDid: authorization.actorDid,
+          authorization,
+          summary: { completed: 1 },
+        },
+      })
+    ).toBeDefined();
+
+    expect(
+      parseRunEventContent({
+        ...common,
+        kind: "run.cancelled",
+        idempotencyKey: "run-cancelled-authorized",
+        payload: {
+          actorDid: authorization.actorDid,
+          authorization,
+          reason: "superseded",
+        },
+      })
+    ).toBeDefined();
+  });
+
+  it("still refuses an actor that is not a did and an authority that is not an object", () => {
+    const common = {
+      v: RUN_EVENT_SCHEMA_VERSION,
+      runId: "r-0007",
+      ts: 1_785_302_400_000,
+      kind: "run.closed",
+      idempotencyKey: "run-closed-bad",
+    } as const;
+
+    expect(
+      parseRunEventContent({ ...common, payload: { actorDid: "" } })
+    ).toBeUndefined();
+    expect(
+      parseRunEventContent({ ...common, payload: { authorization: "signed" } })
+    ).toBeUndefined();
+  });
 });
 
 describe("append idempotency", () => {

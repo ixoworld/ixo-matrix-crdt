@@ -33,11 +33,27 @@ export interface RunStartedPayload {
 
 export interface RunClosedPayload {
   invocationCid?: string;
+  /**
+   * Who closed the run, when that is not simply whoever sent the event.
+   *
+   * A run can be closed under a signed invocation the sender is relaying
+   * rather than issuing — a Design POD release is closed on the authority in
+   * {@link RunClosedPayload.authorization}, whose actor need not be the Matrix
+   * sender. Readers rebuild the terminal record from this field, so it has to
+   * survive the trip.
+   */
+  actorDid?: string;
+  /** The signed invocation the close was made under, for a run that demands one. */
+  authorization?: JsonObject;
   summary?: JsonObject;
 }
 
 export interface RunCancelledPayload {
   invocationCid?: string;
+  /** See {@link RunClosedPayload.actorDid}. */
+  actorDid?: string;
+  /** See {@link RunClosedPayload.authorization}. */
+  authorization?: JsonObject;
   reason?: string;
   summary?: JsonObject;
 }
@@ -889,22 +905,26 @@ function validateRunStarted(payload: JsonObject, issues: string[]) {
 function validateRunClosed(payload: JsonObject, issues: string[]) {
   allowedKeys(
     payload,
-    ["invocationCid", "summary"],
+    ["invocationCid", "actorDid", "authorization", "summary"],
     "run.closed payload",
     issues
   );
   optionalString(payload, "invocationCid", 512, issues);
+  optionalString(payload, "actorDid", 512, issues);
+  optionalRecord(payload, "authorization", issues);
   optionalRecord(payload, "summary", issues);
 }
 
 function validateRunCancelled(payload: JsonObject, issues: string[]) {
   allowedKeys(
     payload,
-    ["invocationCid", "reason", "summary"],
+    ["invocationCid", "actorDid", "authorization", "reason", "summary"],
     "run.cancelled payload",
     issues
   );
   optionalString(payload, "invocationCid", 512, issues);
+  optionalString(payload, "actorDid", 512, issues);
+  optionalRecord(payload, "authorization", issues);
   optionalString(payload, "reason", 4_096, issues);
   optionalRecord(payload, "summary", issues);
 }
